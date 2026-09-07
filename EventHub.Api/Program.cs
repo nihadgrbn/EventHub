@@ -18,5 +18,4 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-// Removed default WeatherForecast demo endpoint and types.
 app.Run();
