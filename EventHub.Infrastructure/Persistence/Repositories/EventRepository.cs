@@ -25,5 +25,15 @@ namespace EventHub.Infrastructure.Persistence.Repositories
         {
             return await _context.Events.AsNoTracking().ToListAsync(cancellationToken);
         }
+
+        public void Update(Event @event)
+        {
+            _context.Events.Update(@event);
+        }
+
+        public void Delete(Event @event)
+        {
+            _context.Events.Remove(@event);
+        }
     }
 }

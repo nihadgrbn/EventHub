@@ -1,4 +1,6 @@
+using EventHub.Application.Common.Exceptions;
 using FluentValidation;
+using EventHub.Application.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -38,8 +40,8 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                         .ToDictionary(
                             group => group.Key,
                             group => group.Select(error => error.ErrorMessage).ToArray())),
-            KeyNotFoundException =>
-                (StatusCodes.Status404NotFound, "The requested resource was not found.", null),
+            NotFoundException notFoundException =>
+                (StatusCodes.Status404NotFound, notFoundException.Message, null),
             _ =>
                 (StatusCodes.Status500InternalServerError, "An unexpected error occurred.", null)
         };

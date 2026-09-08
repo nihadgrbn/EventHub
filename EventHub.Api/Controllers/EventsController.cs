@@ -1,4 +1,6 @@
 ﻿using EventHub.Application.Events.Commands.CreateEvent;
+using EventHub.Application.Events.Commands.DeleteEvent;
+using EventHub.Application.Events.Commands.UpdateEvent;
 using EventHub.Application.Events.Queries.GetEventById;
 using EventHub.Application.Events.Queries.GetEvents;
 using MediatR;
@@ -40,6 +42,25 @@ namespace EventHub.Api.Controllers
             var @event = await _sender.Send(query);
 
             return Ok(@event);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] UpdateEventCommand command)
+        {
+            if (id != command.Id)
+            {
+                return BadRequest("The route id does not match the event id.");
+            }
+
+            await _sender.Send(command);
+            return NoContent();
+        }
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteEvent(Guid id)
+        {
+            await _sender.Send(new DeleteEventCommand(id));
+            return NoContent();
         }
 
     }

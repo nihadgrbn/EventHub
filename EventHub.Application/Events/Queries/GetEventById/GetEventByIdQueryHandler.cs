@@ -1,4 +1,5 @@
-﻿using EventHub.Application.Common.Interfaces;
+﻿using EventHub.Application.Common.Exceptions;
+using EventHub.Application.Common.Interfaces;
 using EventHub.Application.Events.Queries.GetEvents;
 using Mapster;
 using MediatR;
@@ -22,7 +23,7 @@ namespace EventHub.Application.Events.Queries.GetEventById
             var @event = await _eventRepository.GetByIdAsync(request.Id, cancellationToken);
 
             if (@event is null)
-                throw new Exception("Tədbir tapılmadı.");
+                throw new NotFoundException("Event not found.");
 
             return @event.Adapt<EventResponse>();
         }

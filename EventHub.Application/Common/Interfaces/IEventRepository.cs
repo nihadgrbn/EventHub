@@ -10,7 +10,8 @@ namespace EventHub.Application.Common.Interfaces
         Task AddAsync(Event @event, CancellationToken cancellationToken);
         Task<IEnumerable<Event>> GetAllAsync(CancellationToken cancellationToken);
         Task<Event?> GetByIdAsync(Guid id,CancellationToken cancellationToken);
-
+        void Update(Event @event);
+        void Delete(Event @event);
 
     }
 }
