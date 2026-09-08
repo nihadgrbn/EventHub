@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using EventHub.Application.Events.Commands.CreateEvent;
+using EventHub.Application.Events.Queries.GetEventById;
+using EventHub.Application.Events.Queries.GetEvents;
 using MediatR;
-using EventHub.Application.Events.Commands.CreateEvent;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 
 
 namespace EventHub.Api.Controllers
@@ -17,11 +19,27 @@ namespace EventHub.Api.Controllers
             _sender = sender;
             
         }
+        [HttpGet]
+        public async Task<IActionResult> GetAllEvents()
+        {
+            var query = new GetEventsQuery();
+            var events = await _sender.Send(query);
+
+            return Ok(events); 
+        }
         [HttpPost]
         public async Task <IActionResult> CreateEvent([FromBody] CreateEventCommand command)
         {
             var eventId = await _sender.Send(command);
             return CreatedAtAction(nameof(CreateEvent), new { id = eventId }, eventId);
+        }
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetEventById(Guid id)
+        {
+            var query = new GetEventByIdQuery(id);
+            var @event = await _sender.Send(query);
+
+            return Ok(@event);
         }
 
     }

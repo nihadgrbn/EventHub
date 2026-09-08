@@ -21,5 +21,9 @@ namespace EventHub.Infrastructure.Persistence.Repositories
         {
             return await _context.Events.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
         }
+        public async Task<IEnumerable<Event>> GetAllAsync(CancellationToken cancellationToken)
+        {
+            return await _context.Events.AsNoTracking().ToListAsync(cancellationToken);
+        }
     }
 }
