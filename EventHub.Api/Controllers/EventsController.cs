@@ -4,12 +4,14 @@ using EventHub.Application.Events.Commands.UpdateEvent;
 using EventHub.Application.Events.Queries.GetEventById;
 using EventHub.Application.Events.Queries.GetEvents;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 
 namespace EventHub.Api.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
 
@@ -47,12 +49,7 @@ namespace EventHub.Api.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] UpdateEventCommand command)
         {
-            if (id != command.Id)
-            {
-                return BadRequest("The route id does not match the event id.");
-            }
-
-            await _sender.Send(command);
+            await _sender.Send(command with { Id = id });
             return NoContent();
         }
 

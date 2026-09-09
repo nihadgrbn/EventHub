@@ -1,0 +1,54 @@
+﻿using EventHub.Application.Authentication;
+using EventHub.Application.Authentication.Command.Register;
+using EventHub.Application.Common.Exceptions;
+using EventHub.Application.Common.Interfaces;
+using EventHub.Domain.Entities;
+using MediatR;
+
+namespace EventHub.Application.Authentication.Commands.Register;
+
+public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthResponse>
+{
+    private readonly IUserRepository _userRepository;
+    private readonly IPasswordHasher _passwordHasher;
+    private readonly IJwtProvider _jwtProvider;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public RegisterCommandHandler(
+        IUserRepository userRepository,
+        IPasswordHasher passwordHasher,
+        IJwtProvider jwtProvider,
+        IUnitOfWork unitOfWork)
+    {
+        _userRepository = userRepository;
+        _passwordHasher = passwordHasher;
+        _jwtProvider = jwtProvider;
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<AuthResponse> Handle(RegisterCommand request, CancellationToken cancellationToken)
+    {
+        if (!await _userRepository.IsEmailUniqueAsync(request.Email, cancellationToken))
+        {
+            throw new ConflictException("Bu email artıq istifadə olunur.");
+        }
+
+        var hashedPassword = _passwordHasher.Hash(request.Password);
+
+        var user = new User
+        {
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            Email = request.Email,
+            PasswordHash = hashedPassword,
+            Role = "Organizer"
+        };
+
+        await _userRepository.AddAsync(user, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        var token = _jwtProvider.Generate(user);
+
+        return new AuthResponse(user.Id, user.FirstName, user.LastName, user.Email, token);
+    }
+}

@@ -1,11 +1,14 @@
 using MediatR;
+using System.Text.Json.Serialization;
 
 namespace EventHub.Application.Events.Commands.UpdateEvent;
 
 public record UpdateEventCommand(
-    Guid Id,
     string Title,
     string Description,
     DateTime Date,
-    string Location,
-    Guid OrganizerId) : IRequest;
+    string Location) : IRequest
+{
+    [JsonIgnore]
+    public Guid Id { get; init; }
+}

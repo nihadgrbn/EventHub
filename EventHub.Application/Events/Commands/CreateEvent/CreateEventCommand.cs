@@ -9,7 +9,6 @@ namespace EventHub.Application.Events.Commands.CreateEvent
         string Title,
         string Description,
         DateTime Date,
-        string Location,
-        Guid OrganizerId) : IRequest<Guid>;
+    string Location) : IRequest<Guid>;
     
 }

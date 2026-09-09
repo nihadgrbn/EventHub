@@ -14,5 +14,6 @@ namespace EventHub.Domain.Entities
 
         //will changing
         public string Role {  get; set; } = string.Empty;
+        public ICollection<Event> Events { get; set; } = new List<Event>();
     }
 }

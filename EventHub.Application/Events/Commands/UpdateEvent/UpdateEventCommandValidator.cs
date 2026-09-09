@@ -16,7 +16,6 @@ public class UpdateEventCommandValidator : AbstractValidator<UpdateEventCommand>
         RuleFor(v => v.Date)
             .GreaterThan(DateTime.UtcNow).WithMessage("Event date must be in the future.");
 
-        RuleFor(v => v.OrganizerId)
-            .NotEmpty().WithMessage("Organizer ID is required.");
+
     }
 }

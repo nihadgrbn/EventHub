@@ -1,4 +1,3 @@
-using EventHub.Application.Common.Exceptions;
 using FluentValidation;
 using EventHub.Application.Common.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
@@ -25,10 +24,20 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
-        _logger.LogError(
-            exception,
-            "An unhandled exception occurred while processing the request {Path}.",
-            httpContext.Request.Path);
+        if (exception is ValidationException or ConflictException or UnauthorizedException)
+        {
+            _logger.LogWarning(
+                "Request failed with {ExceptionType} for {Path}.",
+                exception.GetType().Name,
+                httpContext.Request.Path);
+        }
+        else
+        {
+            _logger.LogError(
+                exception,
+                "An unhandled exception occurred while processing the request {Path}.",
+                httpContext.Request.Path);
+        }
 
         var (statusCode, title, errors) = exception switch
         {
@@ -42,6 +51,12 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                             group => group.Select(error => error.ErrorMessage).ToArray())),
             NotFoundException notFoundException =>
                 (StatusCodes.Status404NotFound, notFoundException.Message, null),
+            ConflictException conflictException =>
+                (StatusCodes.Status409Conflict, conflictException.Message, null),
+            UnauthorizedException unauthorizedException =>
+                (StatusCodes.Status401Unauthorized, unauthorizedException.Message, null),
+            ForbiddenException forbiddenException =>
+                (StatusCodes.Status403Forbidden, forbiddenException.Message, null),
             _ =>
                 (StatusCodes.Status500InternalServerError, "An unexpected error occurred.", null)
         };

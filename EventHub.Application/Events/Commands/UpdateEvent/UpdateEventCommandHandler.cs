@@ -8,11 +8,16 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UpdateEventCommandHandler(IEventRepository eventRepository, IUnitOfWork unitOfWork)
+    public UpdateEventCommandHandler(
+        IEventRepository eventRepository,
+        IUnitOfWork unitOfWork,
+        ICurrentUserService currentUserService)
     {
         _eventRepository = eventRepository;
         _unitOfWork = unitOfWork;
+        _currentUserService = currentUserService;
     }
 
     public async Task Handle(UpdateEventCommand request, CancellationToken cancellationToken)
@@ -24,11 +29,18 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand>
             throw new NotFoundException("Event not found.");
         }
 
+        var currentUserId = _currentUserService.UserId
+            ?? throw new UnauthorizedException("A valid user is required to update an event.");
+
+        if (@event.OrganizerId != currentUserId)
+        {
+            throw new ForbiddenException("You can only update your own events.");
+        }
+
         @event.Title = request.Title;
         @event.Description = request.Description;
         @event.Date = request.Date;
         @event.Location = request.Location;
-        @event.OrganizerId = request.OrganizerId;
 
         _eventRepository.Update(@event);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
