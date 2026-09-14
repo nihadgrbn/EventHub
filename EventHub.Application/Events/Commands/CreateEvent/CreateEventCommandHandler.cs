@@ -32,7 +32,14 @@ namespace EventHub.Application.Events.Commands.CreateEvent
                 Description = request.Description,
                 Date = request.Date,
                 Location = request.Location,
-                OrganizerId = userId
+                OrganizerId = userId,
+                TicketTypes = request.TicketTypes.Select(t => new TicketType
+                {
+                    Name = t.Name,
+                    Price = t.Price,
+                    Quantity = t.Quantity,
+                    AvailableQuantity = t.Quantity
+                }).ToList()
             };
 
             await _eventRepository.AddAsync(newEvent, cancellationToken);

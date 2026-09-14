@@ -1,7 +1,5 @@
 ﻿using EventHub.Domain.Common;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Net.Sockets;
 
 namespace EventHub.Domain.Entities
 {
@@ -14,6 +12,7 @@ namespace EventHub.Domain.Entities
         
         public Guid EventId { get; set; }
         public Event? Event { get; set; }
+        public ICollection<Ticket> Tickets { get; set; } = new List<Ticket>();
 
     }
 }

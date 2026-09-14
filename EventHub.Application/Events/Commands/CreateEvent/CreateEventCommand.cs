@@ -9,6 +9,8 @@ namespace EventHub.Application.Events.Commands.CreateEvent
         string Title,
         string Description,
         DateTime Date,
-    string Location) : IRequest<Guid>;
+        string Location,
+        List<CreateTicketTypeDto> TicketTypes
+        ) : IRequest<Guid>;
     
 }

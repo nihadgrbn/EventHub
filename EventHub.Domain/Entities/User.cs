@@ -1,7 +1,4 @@
 ﻿using EventHub.Domain.Common;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace EventHub.Domain.Entities
 {
@@ -16,5 +13,6 @@ namespace EventHub.Domain.Entities
 
         public string Role {  get; set; } = string.Empty;
         public ICollection<Event> Events { get; set; } = new List<Event>();
+        public ICollection<Ticket> PurchasedTickets { get; set; } = new List<Ticket>();
     }
 }

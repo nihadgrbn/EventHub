@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace EventHub.Infrastructure.Authentication
+﻿namespace EventHub.Infrastructure.Authentication
 {
     public class JwtOptions
     {
