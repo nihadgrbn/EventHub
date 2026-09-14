@@ -45,10 +45,13 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
         };
 
         await _userRepository.AddAsync(user, cancellationToken);
+        var token = _jwtProvider.Generate(user);
+        var refreshToken = _jwtProvider.GenerateRefreshToken();
+        user.RefreshTokenHash = _jwtProvider.HashRefreshToken(refreshToken);
+        user.RefreshTokenExpiryTime = _jwtProvider.GetRefreshTokenExpiryTime();
+
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var token = _jwtProvider.Generate(user);
-
-        return new AuthResponse(user.Id, user.FirstName, user.LastName, user.Email, token);
+        return new AuthResponse(user.Id, user.FirstName, user.LastName, user.Email, token, refreshToken);
     }
 }

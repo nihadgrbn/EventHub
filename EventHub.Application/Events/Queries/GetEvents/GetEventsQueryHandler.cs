@@ -1,5 +1,4 @@
 ﻿using EventHub.Application.Common.Interfaces;
-using Mapster;
 using MediatR;
 using System;
 using System.Collections.Generic;
@@ -18,7 +17,16 @@ namespace EventHub.Application.Events.Queries.GetEvents
         {
             var events = await _eventRepository.GetAllAsync(cancellationToken);
 
-            return events.Adapt<IEnumerable<EventResponse>>();
+            return events.Select(@event => new EventResponse(
+                @event.Id,
+                @event.Title,
+                @event.Description,
+                @event.Date,
+                @event.Location,
+                @event.OrganizerId,
+                @event.Organizer is null
+                    ? string.Empty
+                    : $"{@event.Organizer.FirstName} {@event.Organizer.LastName}"));
         }
     }
 }

@@ -1,7 +1,6 @@
 ﻿using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Application.Events.Queries.GetEvents;
-using Mapster;
 using MediatR;
 using System;
 using System.Collections.Generic;
@@ -25,7 +24,16 @@ namespace EventHub.Application.Events.Queries.GetEventById
             if (@event is null)
                 throw new NotFoundException("Event not found.");
 
-            return @event.Adapt<EventResponse>();
+            return new EventResponse(
+                @event.Id,
+                @event.Title,
+                @event.Description,
+                @event.Date,
+                @event.Location,
+                @event.OrganizerId,
+                @event.Organizer is null
+                    ? string.Empty
+                    : $"{@event.Organizer.FirstName} {@event.Organizer.LastName}");
         }
     }
 }

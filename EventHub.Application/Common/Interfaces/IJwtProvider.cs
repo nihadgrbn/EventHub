@@ -8,5 +8,8 @@ namespace EventHub.Application.Common.Interfaces
     public interface IJwtProvider
     {
         string Generate(User user);
+        string GenerateRefreshToken();
+        string HashRefreshToken(string refreshToken);
+        DateTime GetRefreshTokenExpiryTime();
     }
 }

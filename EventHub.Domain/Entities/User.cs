@@ -11,8 +11,9 @@ namespace EventHub.Domain.Entities
         public string LastName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string PasswordHash { get; set; } = string.Empty;
+        public string? RefreshTokenHash { get; set; }
+        public DateTime? RefreshTokenExpiryTime { get; set; }
 
-        //will changing
         public string Role {  get; set; } = string.Empty;
         public ICollection<Event> Events { get; set; } = new List<Event>();
     }

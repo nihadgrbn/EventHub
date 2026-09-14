@@ -27,4 +27,13 @@ public class UserRepository : IUserRepository
     {
         return !await _context.Users.AnyAsync(u => u.Email == email, cancellationToken);
     }
+
+    public async Task<User?> GetByRefreshTokenHashAsync(
+        string refreshTokenHash,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Users.SingleOrDefaultAsync(
+            u => u.RefreshTokenHash == refreshTokenHash,
+            cancellationToken);
+    }
 }

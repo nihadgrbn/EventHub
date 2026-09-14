@@ -16,6 +16,7 @@ namespace EventHub.Infrastructure.Persistence.Configurations
             builder.Property(u => u.FirstName).HasMaxLength(50).IsRequired();
             builder.Property(u => u.LastName).HasMaxLength(50).IsRequired();
             builder.Property(u => u.Email).HasMaxLength(100).IsRequired();
+            builder.Property(u => u.RefreshTokenHash).HasMaxLength(64);
 
         }
     }

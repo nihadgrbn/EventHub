@@ -29,12 +29,15 @@ namespace EventHub.Application.Authentication.Queries.Login
 
             if (user is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
             {
-                throw new UnauthorizedException("Email və ya parol yanlışdır.");
+                throw new UnauthorizedException("Email ve Password yanlisdir");
             }
 
             var token = _jwtProvider.Generate(user);
+            var refreshToken = _jwtProvider.GenerateRefreshToken();
+            user.RefreshTokenHash = _jwtProvider.HashRefreshToken(refreshToken);
+            user.RefreshTokenExpiryTime = _jwtProvider.GetRefreshTokenExpiryTime();
 
-            return new AuthResponse(user.Id, user.FirstName, user.LastName, user.Email, token);
+            return new AuthResponse(user.Id, user.FirstName, user.LastName, user.Email, token, refreshToken);
         }
     }
 }

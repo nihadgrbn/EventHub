@@ -10,6 +10,7 @@ namespace EventHub.Application.Events.Queries.GetEvents
         string Description,
         DateTime Date,
         string Location,
-        Guid OrganizerId);
+        Guid OrganizerId,
+        string OrganizerName);
     
 }

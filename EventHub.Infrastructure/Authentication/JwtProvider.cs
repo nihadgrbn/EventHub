@@ -1,4 +1,5 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
 using EventHub.Application.Common.Interfaces;
@@ -35,9 +36,25 @@ public class JwtProvider : IJwtProvider
             _options.Audience,
             claims,
             null,
-            DateTime.UtcNow.AddHours(1),
+            DateTime.UtcNow.AddMinutes(_options.AccessTokenLifetimeMinutes),
             signingCredentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public string GenerateRefreshToken()
+    {
+        return Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+    }
+
+    public string HashRefreshToken(string refreshToken)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken));
+        return Convert.ToHexString(hash);
+    }
+
+    public DateTime GetRefreshTokenExpiryTime()
+    {
+        return DateTime.UtcNow.AddDays(_options.RefreshTokenLifetimeDays);
     }
 }

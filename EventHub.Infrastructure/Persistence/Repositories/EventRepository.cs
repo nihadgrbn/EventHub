@@ -19,11 +19,16 @@ namespace EventHub.Infrastructure.Persistence.Repositories
         }
         public async Task<Event?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
         {
-            return await _context.Events.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
+            return await _context.Events
+                .Include(e => e.Organizer)
+                .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
         }
         public async Task<IEnumerable<Event>> GetAllAsync(CancellationToken cancellationToken)
         {
-            return await _context.Events.AsNoTracking().ToListAsync(cancellationToken);
+            return await _context.Events
+                .AsNoTracking()
+                .Include(e => e.Organizer)
+                .ToListAsync(cancellationToken);
         }
 
         public void Update(Event @event)
