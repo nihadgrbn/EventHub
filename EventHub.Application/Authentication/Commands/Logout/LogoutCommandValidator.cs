@@ -7,6 +7,6 @@ public sealed class LogoutCommandValidator : AbstractValidator<LogoutCommand>
     public LogoutCommandValidator()
     {
         RuleFor(command => command.RefreshToken)
-            .NotEmpty().WithMessage("Refresh token boş ola bilməz.");
+            .NotEmpty().WithMessage("Refresh token cannot be empty.");
     }
 }

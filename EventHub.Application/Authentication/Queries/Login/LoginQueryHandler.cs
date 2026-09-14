@@ -32,7 +32,7 @@ namespace EventHub.Application.Authentication.Queries.Login
 
             if (user is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
             {
-                throw new UnauthorizedException("Email ve Password yanlisdir");
+                throw new UnauthorizedException("Email or password is wrong");
             }
 
             var token = _jwtProvider.Generate(user);

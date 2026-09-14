@@ -10,36 +10,36 @@ public class RegisterCommandValidator : AbstractValidator<RegisterCommand>
     {
         RuleFor(v => v.FirstName)
             .Cascade(CascadeMode.Stop)
-            .NotEmpty().WithMessage("Ad boş ola bilməz.")
-            .Length(2, 50).WithMessage("Ad 2-50 simvol aralığında olmalıdır.")
-            .Matches("^[\\p{L} .'-]+$").WithMessage("Ad yalnız hərflərdən ibarət olmalıdır.");
+            .NotEmpty().WithMessage("First name cannot be empty.")
+            .Length(2, 50).WithMessage("First name must be between 2 and 50 characters.")
+            .Matches("^[\\p{L} .'-]+$").WithMessage("First name can only contain letters.");
 
         RuleFor(v => v.LastName)
             .Cascade(CascadeMode.Stop)
-            .NotEmpty().WithMessage("Soyad boş ola bilməz.")
-            .Length(2, 50).WithMessage("Soyad 2-50 simvol aralığında olmalıdır.")
-            .Matches("^[\\p{L} .'-]+$").WithMessage("Soyad yalnız hərflərdən ibarət olmalıdır.");
+            .NotEmpty().WithMessage("Last name cannot be empty.")
+            .Length(2, 50).WithMessage("Last name must be between 2 and 50 characters.")
+            .Matches("^[\\p{L} .'-]+$").WithMessage("Last name can only contain letters.");
 
         RuleFor(v => v.Email)
             .Cascade(CascadeMode.Stop)
-            .NotEmpty().WithMessage("Email boş ola bilməz.")
-            .MaximumLength(100).WithMessage("Email ən çox 100 simvol ola bilər.")
-            .EmailAddress().WithMessage("Düzgün email formatı daxil edin.");
+            .NotEmpty().WithMessage("Email cannot be empty.")
+            .MaximumLength(100).WithMessage("Email can be at most 100 characters long.")
+            .EmailAddress().WithMessage("Please enter a valid email address.");
 
         RuleFor(v => v.Password)
             .Cascade(CascadeMode.Stop)
-            .NotEmpty().WithMessage("Parol boş ola bilməz.")
-            .MinimumLength(8).WithMessage("Parol ən azı 8 simvol olmalıdır.")
-            .MaximumLength(128).WithMessage("Parol ən çox 128 simvol ola bilər.")
-            .Matches("[A-Z]").WithMessage("Parolda ən azı bir böyük hərf olmalıdır.")
-            .Matches("[a-z]").WithMessage("Parolda ən azı bir kiçik hərf olmalıdır.")
-            .Matches("[0-9]").WithMessage("Parolda ən azı bir rəqəm olmalıdır.")
-            .Matches("[^a-zA-Z0-9]").WithMessage("Parolda ən azı bir xüsusi simvol olmalıdır.");
+            .NotEmpty().WithMessage("Password cannot be empty.")
+            .MinimumLength(8).WithMessage("Password must be at least 8 characters long.")
+            .MaximumLength(128).WithMessage("Password can be at most 128 characters long.")
+            .Matches("[A-Z]").WithMessage("Password must contain at least one uppercase letter.")
+            .Matches("[a-z]").WithMessage("Password must contain at least one lowercase letter.")
+            .Matches("[0-9]").WithMessage("Password must contain at least one digit.")
+            .Matches("[^a-zA-Z0-9]").WithMessage("Password must contain at least one special character.");
 
         RuleFor(v => v.Role)
             .Cascade(CascadeMode.Stop)
-            .NotEmpty().WithMessage("Rol boş ola bilməz.")
+            .NotEmpty().WithMessage("Role cannot be empty.")
             .Must(Roles.IsSelfAssignable)
-            .WithMessage("Yalnız 'Organizer' və ya 'Attendee' rolunu seçə bilərsiniz.");
+            .WithMessage("You can only select the 'Organizer' or 'Attendee' role.");
     }
 }
