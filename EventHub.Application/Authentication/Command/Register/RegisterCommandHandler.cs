@@ -3,6 +3,7 @@ using EventHub.Application.Authentication.Command.Register;
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Domain.Entities;
+using EventHub.Domain.Constants;
 using MediatR;
 
 namespace EventHub.Application.Authentication.Commands.Register;
@@ -41,7 +42,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
             LastName = request.LastName,
             Email = request.Email,
             PasswordHash = hashedPassword,
-            Role = "Organizer"
+            Role = Roles.Normalize(request.Role)
         };
 
         await _userRepository.AddAsync(user, cancellationToken);
@@ -52,6 +53,6 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new AuthResponse(user.Id, user.FirstName, user.LastName, user.Email, token, refreshToken);
+        return new AuthResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Role, token, refreshToken);
     }
 }

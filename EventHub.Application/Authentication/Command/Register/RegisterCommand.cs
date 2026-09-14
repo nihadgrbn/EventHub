@@ -9,6 +9,7 @@ namespace EventHub.Application.Authentication.Command.Register
         string FirstName,
         string LastName,
         string Email,
-        string Password) : IRequest<AuthResponse>;
+        string Password,
+        string Role) : IRequest<AuthResponse>;
    
 }

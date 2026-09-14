@@ -1,4 +1,5 @@
 ﻿using EventHub.Application.Authentication.Command.Register;
+using EventHub.Domain.Constants;
 using FluentValidation;
 
 namespace EventHub.Application.Authentication.Commands.Register;
@@ -34,5 +35,11 @@ public class RegisterCommandValidator : AbstractValidator<RegisterCommand>
             .Matches("[a-z]").WithMessage("Parolda ən azı bir kiçik hərf olmalıdır.")
             .Matches("[0-9]").WithMessage("Parolda ən azı bir rəqəm olmalıdır.")
             .Matches("[^a-zA-Z0-9]").WithMessage("Parolda ən azı bir xüsusi simvol olmalıdır.");
+
+        RuleFor(v => v.Role)
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty().WithMessage("Rol boş ola bilməz.")
+            .Must(Roles.IsSelfAssignable)
+            .WithMessage("Yalnız 'Organizer' və ya 'Attendee' rolunu seçə bilərsiniz.");
     }
 }

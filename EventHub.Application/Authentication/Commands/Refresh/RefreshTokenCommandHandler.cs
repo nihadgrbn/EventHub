@@ -47,6 +47,7 @@ public sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCom
             user.FirstName,
             user.LastName,
             user.Email,
+            user.Role,
             accessToken,
             newRefreshToken);
     }

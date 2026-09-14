@@ -1,5 +1,6 @@
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
+using EventHub.Domain.Constants;
 using MediatR;
 
 namespace EventHub.Application.Events.Commands.UpdateEvent;
@@ -32,7 +33,8 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand>
         var currentUserId = _currentUserService.UserId
             ?? throw new UnauthorizedException("A valid user is required to update an event.");
 
-        if (@event.OrganizerId != currentUserId)
+        if (!_currentUserService.IsInRole(Roles.Admin)
+            && @event.OrganizerId != currentUserId)
         {
             throw new ForbiddenException("You can only update your own events.");
         }

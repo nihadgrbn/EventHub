@@ -12,15 +12,18 @@ namespace EventHub.Application.Authentication.Queries.Login
         private readonly IUserRepository _userRepository;
         private readonly IPasswordHasher _passwordHasher;
         private readonly IJwtProvider _jwtProvider;
+        private readonly IUnitOfWork _unitOfWork;
 
         public LoginQueryHandler(
             IUserRepository userRepository,
             IPasswordHasher passwordHasher,
-            IJwtProvider jwtProvider)
+            IJwtProvider jwtProvider,
+            IUnitOfWork unitOfWork)
         {
             _userRepository = userRepository;
             _passwordHasher = passwordHasher;
             _jwtProvider = jwtProvider;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<AuthResponse> Handle(LoginQuery request, CancellationToken cancellationToken)
@@ -36,8 +39,9 @@ namespace EventHub.Application.Authentication.Queries.Login
             var refreshToken = _jwtProvider.GenerateRefreshToken();
             user.RefreshTokenHash = _jwtProvider.HashRefreshToken(refreshToken);
             user.RefreshTokenExpiryTime = _jwtProvider.GetRefreshTokenExpiryTime();
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            return new AuthResponse(user.Id, user.FirstName, user.LastName, user.Email, token, refreshToken);
+            return new AuthResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Role, token, refreshToken);
         }
     }
 }

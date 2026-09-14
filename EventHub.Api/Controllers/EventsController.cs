@@ -7,6 +7,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using EventHub.Domain.Constants;
 
 
 namespace EventHub.Api.Controllers
@@ -32,6 +33,7 @@ namespace EventHub.Api.Controllers
             return Ok(events); 
         }
         [HttpPost]
+        [Authorize(Roles = Roles.OrganizerOrAdmin)]
         public async Task <IActionResult> CreateEvent([FromBody] CreateEventCommand command)
         {
             var eventId = await _sender.Send(command);
@@ -47,6 +49,7 @@ namespace EventHub.Api.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = Roles.OrganizerOrAdmin)]
         public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] UpdateEventCommand command)
         {
             await _sender.Send(command with { Id = id });
@@ -54,6 +57,7 @@ namespace EventHub.Api.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = Roles.OrganizerOrAdmin)]
         public async Task<IActionResult> DeleteEvent(Guid id)
         {
             await _sender.Send(new DeleteEventCommand(id));

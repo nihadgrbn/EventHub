@@ -9,6 +9,7 @@ namespace EventHub.Application.Authentication
         string FirstName,
         string LastName,
         string Email,
+        string Role,
         string Token,
         string RefreshToken
         );
