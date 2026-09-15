@@ -12,6 +12,14 @@ namespace EventHub.Application.Common.Interfaces
         Task<Event?> GetByIdAsync(Guid id,CancellationToken cancellationToken);
         void Update(Event @event);
         void Delete(Event @event);
+        Task<(IEnumerable<Event> Events, int TotalCount)> GetPagedEventsAsync(
+            string? searchTerm, 
+            string? location, 
+            string? sortBy, 
+            string? sortOrder,
+            int pageNumber, 
+            int pageSize, 
+            CancellationToken cancellationToken);
 
     }
 }

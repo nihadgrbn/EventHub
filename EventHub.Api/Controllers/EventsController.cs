@@ -23,14 +23,13 @@ namespace EventHub.Api.Controllers
             _sender = sender;
             
         }
+
         [HttpGet]
         [AllowAnonymous]
-        public async Task<IActionResult> GetAllEvents()
+        public async Task<IActionResult> GetEvents([FromQuery] GetEventsQuery query)
         {
-            var query = new GetEventsQuery();
-            var events = await _sender.Send(query);
-
-            return Ok(events); 
+            var result = await _sender.Send(query);
+            return Ok(result);
         }
         [HttpPost]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]

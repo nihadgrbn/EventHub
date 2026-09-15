@@ -42,5 +42,40 @@ namespace EventHub.Infrastructure.Persistence.Repositories
         {
             _context.Events.Remove(@event);
         }
+        public async Task<(IEnumerable<Event> Events, int TotalCount)> GetPagedEventsAsync(
+    string? searchTerm, string? location, string? sortBy, string? sortOrder,
+    int pageNumber, int pageSize, CancellationToken cancellationToken)
+        {
+            var query = _context.Events
+                .Include(e => e.Organizer)
+                .Include(e => e.TicketTypes)
+                .AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                query = query.Where(e => e.Title.Contains(searchTerm) || e.Description.Contains(searchTerm));
+            }
+
+            if (!string.IsNullOrWhiteSpace(location))
+            {
+                query = query.Where(e => e.Location.Contains(location));
+            }
+
+            query = sortBy?.ToLower() switch
+            {
+                "title" => sortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.Title) : query.OrderBy(e => e.Title),
+                "date" => sortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.Date) : query.OrderBy(e => e.Date),
+                _ => query.OrderBy(e => e.Date) // Heç nə göndərilməsə, tarixə görə sırala (Default)
+            };
+
+            var totalCount = await query.CountAsync(cancellationToken);
+
+            var events = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return (events, totalCount);
+        }
     }
 }
