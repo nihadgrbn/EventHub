@@ -24,14 +24,17 @@ public sealed class TicketTypeRepository : ITicketTypeRepository
 
     public async Task<bool> TryDecreaseAvailableQuantityAsync(
         Guid id,
+        int quantity,
         CancellationToken cancellationToken)
     {
         return await _context.TicketTypes
-            .Where(ticketType => ticketType.Id == id && ticketType.AvailableQuantity > 0)
+            .Where(ticketType =>
+                ticketType.Id == id
+                && ticketType.AvailableQuantity >= quantity)
             .ExecuteUpdateAsync(
                 setters => setters.SetProperty(
                     ticketType => ticketType.AvailableQuantity,
-                    ticketType => ticketType.AvailableQuantity - 1),
+                    ticketType => ticketType.AvailableQuantity - quantity),
                 cancellationToken) == 1;
     }
 }

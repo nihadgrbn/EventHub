@@ -31,7 +31,7 @@ public sealed class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCom
 
         if (user is null || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
         {
-            throw new UnauthorizedException("Refresh token yanlışdır və ya vaxtı bitib.");
+            throw new UnauthorizedException("The refresh token is invalid or expired.");
         }
 
         var accessToken = _jwtProvider.Generate(user);

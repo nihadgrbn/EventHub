@@ -1,8 +1,5 @@
 ﻿using FluentValidation;
 using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace EventHub.Application.Common.Behaviors
 {

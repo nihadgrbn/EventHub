@@ -3,11 +3,10 @@ using EventHub.Application.Events.Commands.DeleteEvent;
 using EventHub.Application.Events.Commands.UpdateEvent;
 using EventHub.Application.Events.Queries.GetEventById;
 using EventHub.Application.Events.Queries.GetEvents;
+using EventHub.Domain.Constants;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using EventHub.Domain.Constants;
 
 
 namespace EventHub.Api.Controllers
@@ -25,6 +24,7 @@ namespace EventHub.Api.Controllers
             
         }
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAllEvents()
         {
             var query = new GetEventsQuery();

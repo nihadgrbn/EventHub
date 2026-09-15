@@ -33,7 +33,13 @@ namespace EventHub.Application.Events.Queries.GetEventById
                 @event.OrganizerId,
                 @event.Organizer is null
                     ? string.Empty
-                    : $"{@event.Organizer.FirstName} {@event.Organizer.LastName}");
+                    : $"{@event.Organizer.FirstName} {@event.Organizer.LastName}",
+                @event.TicketTypes.Select(ticketType => new TicketTypeResponseDto(
+                    ticketType.Id,
+                    ticketType.Name,
+                    ticketType.Price,
+                    ticketType.AvailableQuantity
+                )).ToList());
         }
     }
 }

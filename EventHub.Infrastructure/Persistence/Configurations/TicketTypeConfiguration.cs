@@ -1,9 +1,6 @@
 ﻿using EventHub.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace EventHub.Infrastructure.Persistence.Configurations
 {
@@ -21,6 +18,8 @@ namespace EventHub.Infrastructure.Persistence.Configurations
                    .WithMany(e => e.TicketTypes)
                    .HasForeignKey(t => t.EventId)
                    .OnDelete(DeleteBehavior.Cascade);
+            builder.Property(t => t.AvailableQuantity)
+                .IsConcurrencyToken();
         }
     }
 }

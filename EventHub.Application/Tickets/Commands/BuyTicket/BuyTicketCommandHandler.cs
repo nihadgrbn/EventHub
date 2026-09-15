@@ -5,7 +5,7 @@ using MediatR;
 
 namespace EventHub.Application.Tickets.Commands.BuyTicket;
 
-public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, Guid>
+public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, IReadOnlyList<Guid>>
 {
     private readonly ITicketTypeRepository _ticketTypeRepository;
     private readonly ITicketRepository _ticketRepository;
@@ -24,7 +24,7 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
         _currentUserService = currentUserService;
     }
 
-    public async Task<Guid> Handle(
+    public async Task<IReadOnlyList<Guid>> Handle(
         BuyTicketCommand request,
         CancellationToken cancellationToken)
     {
@@ -45,19 +45,22 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
             throw new ConflictException("The ticket type does not belong to the selected event.");
         }
 
-        var ticket = new Ticket
-        {
-            EventId = request.EventId,
-            TicketTypeId = request.TicketTypeId,
-            AttendeeId = attendeeId,
-            PurchaseDate = DateTime.UtcNow
-        };
+        var tickets = Enumerable.Range(0, request.Quantity)
+            .Select(_ => new Ticket
+            {
+                EventId = request.EventId,
+                TicketTypeId = request.TicketTypeId,
+                AttendeeId = attendeeId,
+                PurchaseDate = DateTime.UtcNow
+            })
+            .ToList();
 
         await _unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
         {
             var quantityDecreased = await _ticketTypeRepository
                 .TryDecreaseAvailableQuantityAsync(
                     request.TicketTypeId,
+                    request.Quantity,
                     transactionCancellationToken);
 
             if (!quantityDecreased)
@@ -65,10 +68,10 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
                 throw new ConflictException("This ticket type is sold out.");
             }
 
-            await _ticketRepository.AddAsync(ticket, transactionCancellationToken);
+            await _ticketRepository.AddRangeAsync(tickets, transactionCancellationToken);
             await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
         }, cancellationToken);
 
-        return ticket.Id;
+        return tickets.Select(ticket => ticket.Id).ToList();
     }
 }

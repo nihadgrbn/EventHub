@@ -1,9 +1,6 @@
-﻿using EventHub.Application.Common.Interfaces;
-using EventHub.Application.Common.Exceptions;
+﻿using EventHub.Application.Common.Exceptions;
+using EventHub.Application.Common.Interfaces;
 using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace EventHub.Application.Authentication.Queries.Login
 {

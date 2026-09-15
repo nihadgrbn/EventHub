@@ -31,7 +31,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
     {
         if (!await _userRepository.IsEmailUniqueAsync(request.Email, cancellationToken))
         {
-            throw new ConflictException("Bu email artıq istifadə olunur.");
+            throw new ConflictException("This email is already registered.");
         }
 
         var hashedPassword = _passwordHasher.Hash(request.Password);

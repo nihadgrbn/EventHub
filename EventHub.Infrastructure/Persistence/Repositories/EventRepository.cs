@@ -21,6 +21,7 @@ namespace EventHub.Infrastructure.Persistence.Repositories
         {
             return await _context.Events
                 .Include(e => e.Organizer)
+                .Include(e => e.TicketTypes)
                 .FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
         }
         public async Task<IEnumerable<Event>> GetAllAsync(CancellationToken cancellationToken)
@@ -28,6 +29,7 @@ namespace EventHub.Infrastructure.Persistence.Repositories
             return await _context.Events
                 .AsNoTracking()
                 .Include(e => e.Organizer)
+                .Include(e => e.TicketTypes)
                 .ToListAsync(cancellationToken);
         }
 

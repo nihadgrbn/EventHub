@@ -1,4 +1,5 @@
 using EventHub.Application.Tickets.Commands.BuyTicket;
+using EventHub.Application.Tickets.Queries.GetMyTickets;
 using EventHub.Domain.Constants;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -17,21 +18,27 @@ public sealed class TicketsController : ControllerBase
     {
         _sender = sender;
     }
+    [HttpGet("my-tickets")]
+    public async Task<IActionResult> GetMyTickets()
+    {
+        var query = new GetMyTicketsQuery();
+        var result = await _sender.Send(query);
+
+        return Ok(result);
+    }
 
     [HttpPost("buy")]
     public async Task<IActionResult> BuyTicket(
         [FromBody] BuyTicketCommand command,
         CancellationToken cancellationToken)
     {
-        var ticketId = await _sender.Send(command, cancellationToken);
+        var ticketIds = await _sender.Send(command, cancellationToken);
 
-        return CreatedAtAction(
-            nameof(BuyTicket),
-            new { id = ticketId },
-            new
-            {
-                Message = "Ticket purchased successfully.",
-                TicketId = ticketId
-            });
+        return Ok(new
+        {
+            Message = "Tickets purchased successfully.",
+            Quantity = ticketIds.Count,
+            TicketIds = ticketIds
+        });
     }
 }

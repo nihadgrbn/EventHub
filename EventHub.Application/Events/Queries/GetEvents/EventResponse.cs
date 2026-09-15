@@ -11,6 +11,7 @@ namespace EventHub.Application.Events.Queries.GetEvents
         DateTime Date,
         string Location,
         Guid OrganizerId,
-        string OrganizerName);
+        string OrganizerName,
+        IEnumerable<TicketTypeResponseDto> TicketTypes);
     
 }

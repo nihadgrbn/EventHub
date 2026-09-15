@@ -11,5 +11,9 @@ public sealed class BuyTicketCommandValidator : AbstractValidator<BuyTicketComma
 
         RuleFor(command => command.TicketTypeId)
             .NotEmpty().WithMessage("Ticket type ID cannot be empty.");
+
+        RuleFor(command => command.Quantity)
+            .InclusiveBetween(1, 10)
+            .WithMessage("Quantity must be between 1 and 10.");
     }
 }
