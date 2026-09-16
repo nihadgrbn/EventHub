@@ -1,10 +1,10 @@
 ﻿<Solution>
-  <Project Path="docker-compose.dcproj" />
   <Project Path="src/EventHub.Api/EventHub.Api.csproj" />
   <Project Path="src/EventHub.Application/EventHub.Application.csproj" />
   <Project Path="src/EventHub.Domain/EventHub.Domain.csproj" />
   <Project Path="src/EventHub.Infrastructure/EventHub.Infrastructure.csproj" />
 </Solution>
+
 
 
 
