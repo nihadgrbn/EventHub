@@ -18,6 +18,18 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             .HasForeignKey(t => t.AttendeeId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(t => t.Purchase)
+            .WithMany(p => p.Tickets)
+            .HasForeignKey(t => t.PurchaseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Property(t => t.TicketTypeNameAtPurchase)
+            .HasMaxLength(100)
+            .IsRequired();
+
+        builder.Property(t => t.PriceAtPurchase)
+            .HasColumnType("decimal(18,2)");
+
         builder.HasOne(t => t.TicketType)
             .WithMany(tt => tt.Tickets)
             .HasForeignKey(t => t.TicketTypeId)

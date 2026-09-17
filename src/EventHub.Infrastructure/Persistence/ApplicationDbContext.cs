@@ -16,6 +16,8 @@ namespace EventHub.Infrastructure.Persistence
         public DbSet<Event> Events { get; set; }
         public  DbSet<TicketType> TicketTypes { get; set; }
         public DbSet<Ticket> Tickets { get; set; }
+        public DbSet<Purchase> Purchases { get; set; }
+        public DbSet<OutboxMessage> OutboxMessages { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

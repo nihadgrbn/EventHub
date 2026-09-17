@@ -1,9 +1,6 @@
 ﻿using EventHub.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace EventHub.Infrastructure.Persistence.Configurations
 {
@@ -19,6 +16,11 @@ namespace EventHub.Infrastructure.Persistence.Configurations
             builder.Property(u => u.RefreshTokenHash).HasMaxLength(64);
             builder.Property(u => u.PasswordResetTokenHash).HasMaxLength(64);
             builder.Property(u => u.EmailVerificationTokenHash).HasMaxLength(64);
+
+            builder.HasMany(u => u.Purchases)
+                .WithOne(p => p.Attendee)
+                .HasForeignKey(p => p.AttendeeId)
+                .OnDelete(DeleteBehavior.Restrict);
 
         }
     }

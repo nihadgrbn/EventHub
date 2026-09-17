@@ -16,7 +16,12 @@ public class EmailService : IEmailService
         _options = options.Value;
     }
 
-    public async Task SendEmailAsync(string toEmail, string subject, string body, bool isHtml = true)
+    public async Task SendEmailAsync(
+        string toEmail,
+        string subject,
+        string body,
+        bool isHtml = true,
+        CancellationToken cancellationToken = default)
     {
         var email = new MimeMessage();
 
@@ -40,9 +45,10 @@ public class EmailService : IEmailService
 
         await smtp.AuthenticateAsync(
             _options.SenderEmail,
-            _options.Password);
+            _options.Password,
+            cancellationToken);
 
-        await smtp.SendAsync(email);
-        await smtp.DisconnectAsync(true);
+        await smtp.SendAsync(email, cancellationToken);
+        await smtp.DisconnectAsync(true, cancellationToken);
     }
 }

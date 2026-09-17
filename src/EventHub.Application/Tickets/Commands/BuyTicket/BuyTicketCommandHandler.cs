@@ -1,5 +1,7 @@
+using System.Text.Json;
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
+using EventHub.Application.Tickets.Events;
 using EventHub.Domain.Entities;
 using MediatR;
 
@@ -11,17 +13,29 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
     private readonly ITicketRepository _ticketRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IPurchaseRepository _purchaseRepository;
+    private readonly IOutboxRepository _outboxRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly IEventRepository _eventRepository;
 
     public BuyTicketCommandHandler(
         ITicketTypeRepository ticketTypeRepository,
         ITicketRepository ticketRepository,
         IUnitOfWork unitOfWork,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IPurchaseRepository purchaseRepository,
+        IOutboxRepository outboxRepository,
+        IUserRepository userRepository,
+        IEventRepository eventRepository)
     {
         _ticketTypeRepository = ticketTypeRepository;
         _ticketRepository = ticketRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _purchaseRepository = purchaseRepository;
+        _outboxRepository = outboxRepository;
+        _userRepository = userRepository;
+        _eventRepository = eventRepository;
     }
 
     public async Task<IReadOnlyList<Guid>> Handle(
@@ -45,15 +59,60 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
             throw new ConflictException("The ticket type does not belong to the selected event.");
         }
 
+        var attendee = await _userRepository.GetByIdAsync(attendeeId, cancellationToken)
+            ?? throw new UnauthorizedException("The current user could not be found.");
+
+        var eventEntity = await _eventRepository.GetByIdAsync(request.EventId, cancellationToken)
+            ?? throw new NotFoundException("Event not found.");
+
+        var purchasedAt = DateTime.UtcNow;
+
+        var purchaseId = Guid.NewGuid();
+
+        var purchase = new Purchase
+        {
+            Id = purchaseId, // <-- Əlavə olundu
+            AttendeeId = attendeeId,
+            PurchasedAt = purchasedAt,
+            TotalAmount = ticketType.Price * request.Quantity
+        };
+
         var tickets = Enumerable.Range(0, request.Quantity)
             .Select(_ => new Ticket
             {
+                Id = Guid.NewGuid(), // <-- 2. DÜZƏLİŞ: Hər bir bilet üçün əllə xüsusi ID təyin edirik
                 EventId = request.EventId,
                 TicketTypeId = request.TicketTypeId,
                 AttendeeId = attendeeId,
-                PurchaseDate = DateTime.UtcNow
+                PurchaseId = purchase.Id,
+                Purchase = purchase,
+                PurchaseDate = purchasedAt,
+                TicketTypeNameAtPurchase = ticketType.Name,
+                PriceAtPurchase = ticketType.Price
             })
             .ToList();
+
+        purchase.Tickets = tickets;
+
+        var receiptEvent = new PurchaseReceiptEvent(
+            purchase.Id,
+            $"{attendee.FirstName} {attendee.LastName}",
+            attendee.Email,
+            eventEntity.Title,
+            eventEntity.Date,
+            tickets.Select(ticket => new PurchaseReceiptItem(
+                ticket.Id,
+                ticket.TicketTypeNameAtPurchase,
+                ticket.PriceAtPurchase)).ToList(),
+            purchase.TotalAmount);
+
+        var outboxMessage = new OutboxMessage
+        {
+            Type = nameof(PurchaseReceiptEvent),
+            Payload = JsonSerializer.Serialize(receiptEvent),
+            IdempotencyKey = $"purchase-receipt:{purchase.Id}",
+            NextAttemptAt = purchasedAt
+        };
 
         await _unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
         {
@@ -68,7 +127,8 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
                 throw new ConflictException("This ticket type is sold out.");
             }
 
-            await _ticketRepository.AddRangeAsync(tickets, transactionCancellationToken);
+            await _purchaseRepository.AddAsync(purchase, transactionCancellationToken);
+            await _outboxRepository.AddAsync(outboxMessage, transactionCancellationToken);
             await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
         }, cancellationToken);
 

@@ -33,6 +33,19 @@ public sealed class TicketRepository : ITicketRepository
             .OrderByDescending(t => t.PurchaseDate)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<Ticket>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ticketIds,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Tickets
+            .AsNoTracking()
+            .Include(ticket => ticket.Event)
+            .Include(ticket => ticket.TicketType)
+            .Include(ticket => ticket.Attendee)
+            .Where(ticket => ticketIds.Contains(ticket.Id))
+            .ToListAsync(cancellationToken);
+    }
     public async Task<(IEnumerable<Ticket> Tickets, int TotalCount)> GetOrdersByOrganizerIdAsync(
     Guid organizerId, int pageNumber, int pageSize, CancellationToken cancellationToken)
     {

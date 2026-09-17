@@ -9,8 +9,12 @@ namespace EventHub.Domain.Entities
     {
         public Guid EventId { get; set; }
         public Event? Event { get; set; }
+        public Guid PurchaseId { get; set; }
+        public Purchase? Purchase { get; set; }
         public Guid TicketTypeId {  get; set; }
         public TicketType? TicketType { get; set; }
+        public string TicketTypeNameAtPurchase { get; set; } = string.Empty;
+        public decimal PriceAtPurchase { get; set; }
         public Guid AttendeeId { get; set; } 
         public User? Attendee { get; set; }
         public DateTime PurchaseDate { get; set; }

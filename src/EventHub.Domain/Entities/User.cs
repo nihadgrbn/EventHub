@@ -19,5 +19,6 @@ namespace EventHub.Domain.Entities
         public string Role {  get; set; } = string.Empty;
         public ICollection<Event> Events { get; set; } = new List<Event>();
         public ICollection<Ticket> PurchasedTickets { get; set; } = new List<Ticket>();
+        public ICollection<Purchase> Purchases { get; set; } = new List<Purchase>();
     }
 }
