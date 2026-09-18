@@ -21,6 +21,7 @@ public class EmailService : IEmailService
         string subject,
         string body,
         bool isHtml = true,
+        IReadOnlyCollection<EmailAttachment>? attachments = null,
         CancellationToken cancellationToken = default)
     {
         var email = new MimeMessage();
@@ -32,7 +33,15 @@ public class EmailService : IEmailService
         email.To.Add(MailboxAddress.Parse(toEmail));
 
         email.Subject = subject;
-        email.Body = new TextPart(isHtml ? TextFormat.Html : TextFormat.Plain) { Text = body };
+        var bodyBuilder = new BodyBuilder { HtmlBody = isHtml ? body : null, TextBody = isHtml ? null : body };
+        if (attachments is not null)
+        {
+            foreach (var attachment in attachments)
+            {
+                bodyBuilder.Attachments.Add(attachment.FileName, attachment.Content, ContentType.Parse(attachment.ContentType));
+            }
+        }
+        email.Body = bodyBuilder.ToMessageBody();
 
         using var smtp = new SmtpClient();
 

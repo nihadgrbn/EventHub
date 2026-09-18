@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Security.Cryptography;
+using System.Text;
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Application.Tickets.Events;
@@ -82,20 +84,22 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
             TotalAmount = ticketType.Price * request.Quantity
         };
 
-        var tickets = Enumerable.Range(0, request.Quantity)
-            .Select(_ => new Ticket
-            {
-                Id = Guid.NewGuid(), 
-                EventId = request.EventId,
-                TicketTypeId = request.TicketTypeId,
-                AttendeeId = attendeeId,
-                PurchaseId = purchase.Id,
-                Purchase = purchase,
-                PurchaseDate = purchasedAt,
-                TicketTypeNameAtPurchase = ticketType.Name,
-                PriceAtPurchase = ticketType.Price
-            })
+        var ticketTokens = Enumerable.Range(0, request.Quantity)
+            .Select(_ => Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
             .ToList();
+        var tickets = ticketTokens.Select(token => new Ticket
+        {
+            Id = Guid.NewGuid(),
+            EventId = request.EventId,
+            TicketTypeId = request.TicketTypeId,
+            AttendeeId = attendeeId,
+            PurchaseId = purchase.Id,
+            Purchase = purchase,
+            PurchaseDate = purchasedAt,
+            TicketTypeNameAtPurchase = ticketType.Name,
+            PriceAtPurchase = ticketType.Price,
+            QrTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)))
+        }).ToList();
 
         purchase.Tickets = tickets;
 
@@ -105,10 +109,11 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
             attendee.Email,
             eventEntity.Title,
             eventEntity.Date,
-            tickets.Select(ticket => new PurchaseReceiptItem(
-                ticket.Id,
-                ticket.TicketTypeNameAtPurchase,
-                ticket.PriceAtPurchase)).ToList(),
+            tickets.Zip(ticketTokens).Select(pair => new PurchaseReceiptItem(
+                pair.First.Id,
+                pair.First.TicketTypeNameAtPurchase,
+                pair.First.PriceAtPurchase,
+                pair.Second)).ToList(),
             purchase.TotalAmount);
 
         var outboxMessage = new OutboxMessage

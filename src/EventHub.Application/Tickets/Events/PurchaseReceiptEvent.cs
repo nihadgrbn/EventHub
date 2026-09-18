@@ -14,4 +14,5 @@ public sealed record PurchaseReceiptEvent(
 public sealed record PurchaseReceiptItem(
     Guid TicketId,
     string TicketTypeName,
-    decimal Price);
+    decimal Price,
+    string QrToken);

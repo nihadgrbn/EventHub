@@ -2,6 +2,8 @@
 
 namespace EventHub.Application.Common.Interfaces;
 
+public record EmailAttachment(string FileName, byte[] Content, string ContentType);
+
 public interface IEmailService
 {
     Task SendEmailAsync(
@@ -9,5 +11,6 @@ public interface IEmailService
         string subject,
         string body,
         bool isHtml = true,
+        IReadOnlyCollection<EmailAttachment>? attachments = null,
         CancellationToken cancellationToken = default);
 }

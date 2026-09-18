@@ -64,6 +64,7 @@ public sealed class OutboxRepository : IOutboxRepository
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(message => message.Status, OutboxMessageStatus.Sent)
                 .SetProperty(message => message.ProcessedAt, DateTime.UtcNow)
+                .SetProperty(message => message.Payload, string.Empty)
                 .SetProperty(message => message.ProcessingStartedAt, (DateTime?)null), cancellationToken);
     }
 

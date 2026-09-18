@@ -2,6 +2,7 @@ using System.Net;
 using EventHub.Application.Common.Interfaces;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using QRCoder;
 
 namespace EventHub.Application.Tickets.Events;
 
@@ -21,6 +22,7 @@ public sealed class PurchaseReceiptEventHandler : INotificationHandler<PurchaseR
     public async Task Handle(PurchaseReceiptEvent notification, CancellationToken cancellationToken)
     {
         var body = BuildBody(notification);
+        var attachments = notification.Items.Select(CreateQrAttachment).ToList();
 
         try
         {
@@ -28,6 +30,7 @@ public sealed class PurchaseReceiptEventHandler : INotificationHandler<PurchaseR
                 notification.AttendeeEmail,
                 $"EventHub purchase receipt: {notification.EventName}",
                 body,
+                attachments: attachments,
                 cancellationToken: cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -51,7 +54,7 @@ public sealed class PurchaseReceiptEventHandler : INotificationHandler<PurchaseR
         var eventName = WebUtility.HtmlEncode(notification.EventName);
         var items = string.Join(
             "",
-            notification.Items.Select(item => $"<li>{WebUtility.HtmlEncode(item.TicketTypeName)} - {item.Price:0.00} AZN (Ticket: {item.TicketId})</li>"));
+            notification.Items.Select(item => $"<li>{WebUtility.HtmlEncode(item.TicketTypeName)} - {item.Price:0.00} AZN (Ticket: {item.TicketId}; QR attachment: ticket-{item.TicketId}.png)</li>"));
 
         return $"""
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto">
@@ -65,5 +68,13 @@ public sealed class PurchaseReceiptEventHandler : INotificationHandler<PurchaseR
               <p>Purchase ID: {notification.PurchaseId}</p>
             </div>
             """;
+    }
+
+    private static EmailAttachment CreateQrAttachment(PurchaseReceiptItem item)
+    {
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(item.QrToken, QRCodeGenerator.ECCLevel.Q);
+        var png = new PngByteQRCode(data).GetGraphic(12);
+        return new EmailAttachment($"ticket-{item.TicketId}.png", png, "image/png");
     }
 }
