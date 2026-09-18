@@ -10,6 +10,11 @@ namespace EventHub.Application.Events.Commands.CreateEvent
         string Description,
         DateTime Date,
         string Location,
+        string Category,
+        string Address,
+        string? PosterImageUrl,
+        decimal? Latitude,
+        decimal? Longitude,
         List<CreateTicketTypeDto> TicketTypes
         ) : IRequest<Guid>;
     

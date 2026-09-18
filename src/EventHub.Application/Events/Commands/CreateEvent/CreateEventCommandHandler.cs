@@ -32,6 +32,11 @@ namespace EventHub.Application.Events.Commands.CreateEvent
                 Description = request.Description,
                 Date = request.Date,
                 Location = request.Location,
+                Category = request.Category.Trim(),
+                Address = request.Address.Trim(),
+                PosterImageUrl = request.PosterImageUrl?.Trim(),
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
                 OrganizerId = userId,
                 TicketTypes = request.TicketTypes.Select(t => new TicketType
                 {

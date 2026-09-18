@@ -39,6 +39,11 @@ namespace EventHub.Application.Events.Queries.GetEventById
                 @event.Description,
                 @event.Date,
                 @event.Location,
+                @event.Category,
+                @event.Address,
+                @event.PosterImageUrl,
+                @event.Latitude,
+                @event.Longitude,
                 @event.Status,
                 @event.OrganizerId,
                 @event.Organizer is null

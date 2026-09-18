@@ -18,5 +18,8 @@ namespace EventHub.Domain.Entities
         public Guid AttendeeId { get; set; } 
         public User? Attendee { get; set; }
         public DateTime PurchaseDate { get; set; }
+        public string? QrTokenHash { get; set; }
+        public DateTime? CheckedInAt { get; set; }
+        public Guid? CheckedInById { get; set; }
     }
 }

@@ -68,6 +68,9 @@ namespace EventHub.Infrastructure.Persistence.Repositories
         public async Task<(IEnumerable<Event> Events, int TotalCount)> GetPagedEventsAsync(
     string? searchTerm,
     string? location,
+    string? category,
+    DateTime? dateFrom,
+    DateTime? dateTo,
     string? sortBy,
     string? sortOrder,
     int pageNumber,
@@ -88,6 +91,21 @@ namespace EventHub.Infrastructure.Persistence.Repositories
             if (!string.IsNullOrWhiteSpace(location))
             {
                 query = query.Where(e => e.Location.Contains(location));
+            }
+
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                query = query.Where(e => e.Category == category);
+            }
+
+            if (dateFrom.HasValue)
+            {
+                query = query.Where(e => e.Date >= dateFrom.Value);
+            }
+
+            if (dateTo.HasValue)
+            {
+                query = query.Where(e => e.Date <= dateTo.Value);
             }
 
             query = sortBy?.ToLower() switch

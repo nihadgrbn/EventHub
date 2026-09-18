@@ -7,7 +7,12 @@ public record UpdateEventCommand(
     string Title,
     string Description,
     DateTime Date,
-    string Location) : IRequest
+    string Location,
+    string Category,
+    string Address,
+    string? PosterImageUrl,
+    decimal? Latitude,
+    decimal? Longitude) : IRequest
 {
     [JsonIgnore]
     public Guid Id { get; init; }

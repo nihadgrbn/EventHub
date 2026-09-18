@@ -11,6 +11,11 @@ namespace EventHub.Domain.Entities
         public string Description { get; set; }= string.Empty;
         public DateTime Date {  get; set; }
         public string Location { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public string? PosterImageUrl { get; set; }
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
         public Enums.EventStatus Status { get; set; } = Enums.EventStatus.Draft;
 
         public Guid OrganizerId {  get; set; }

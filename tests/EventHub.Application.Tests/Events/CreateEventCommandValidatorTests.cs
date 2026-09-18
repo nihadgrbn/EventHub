@@ -60,5 +60,10 @@ public sealed class CreateEventCommandValidatorTests
         "A community meetup for developers.",
         DateTime.UtcNow.AddDays(7),
         "Baku",
+        "Technology",
+        "1 Neftchilar Avenue, Baku",
+        "https://cdn.example.com/poster.png",
+        40.4093m,
+        49.8671m,
         [new CreateTicketTypeDto("Standard", 20m, 100)]);
 }

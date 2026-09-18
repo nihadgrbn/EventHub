@@ -16,6 +16,9 @@ namespace EventHub.Application.Common.Interfaces
         Task<(IEnumerable<Event> Events, int TotalCount)> GetPagedEventsAsync(
             string? searchTerm, 
             string? location, 
+            string? category,
+            DateTime? dateFrom,
+            DateTime? dateTo,
             string? sortBy, 
             string? sortOrder,
             int pageNumber, 
