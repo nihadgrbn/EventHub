@@ -71,7 +71,7 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
 
         var purchase = new Purchase
         {
-            Id = purchaseId, // <-- Əlavə olundu
+            Id = purchaseId, 
             AttendeeId = attendeeId,
             PurchasedAt = purchasedAt,
             TotalAmount = ticketType.Price * request.Quantity
@@ -80,7 +80,7 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
         var tickets = Enumerable.Range(0, request.Quantity)
             .Select(_ => new Ticket
             {
-                Id = Guid.NewGuid(), // <-- 2. DÜZƏLİŞ: Hər bir bilet üçün əllə xüsusi ID təyin edirik
+                Id = Guid.NewGuid(), 
                 EventId = request.EventId,
                 TicketTypeId = request.TicketTypeId,
                 AttendeeId = attendeeId,
