@@ -1,6 +1,9 @@
 ﻿using EventHub.Application.Events.Commands.CreateEvent;
 using EventHub.Application.Events.Commands.DeleteEvent;
 using EventHub.Application.Events.Commands.UpdateEvent;
+using EventHub.Application.Events.Commands.UpdateEventStatus;
+using EventHub.Application.Events.Commands.UpdateTicketTypes;
+using EventHub.Domain.Enums;
 using EventHub.Application.Events.Queries.GetEventById;
 using EventHub.Application.Events.Queries.GetEvents;
 using EventHub.Domain.Constants;
@@ -39,6 +42,7 @@ namespace EventHub.Api.Controllers
             return CreatedAtAction(nameof(CreateEvent), new { id = eventId }, eventId);
         }
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetEventById(Guid id)
         {
             var query = new GetEventByIdQuery(id);
@@ -55,6 +59,22 @@ namespace EventHub.Api.Controllers
             return NoContent();
         }
 
+        [HttpPatch("{id}/status")]
+        [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateEventStatusRequest request)
+        {
+            await _sender.Send(new UpdateEventStatusCommand(id, request.Status));
+            return NoContent();
+        }
+
+        [HttpPut("{id}/ticket-types")]
+        [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        public async Task<IActionResult> UpdateTicketTypes(Guid id, [FromBody] List<UpdateTicketTypeDto> ticketTypes)
+        {
+            await _sender.Send(new UpdateEventTicketTypesCommand(id, ticketTypes));
+            return NoContent();
+        }
+
         [HttpDelete("{id}")]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
         public async Task<IActionResult> DeleteEvent(Guid id)
@@ -64,4 +84,6 @@ namespace EventHub.Api.Controllers
         }
 
     }
+
+    public record UpdateEventStatusRequest(EventStatus Status);
 }

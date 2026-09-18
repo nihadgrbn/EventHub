@@ -10,6 +10,7 @@ namespace EventHub.Application.Events.Queries.GetEvents
         string Description,
         DateTime Date,
         string Location,
+        EventHub.Domain.Enums.EventStatus Status,
         Guid OrganizerId,
         string OrganizerName,
         IEnumerable<TicketTypeResponseDto> TicketTypes);

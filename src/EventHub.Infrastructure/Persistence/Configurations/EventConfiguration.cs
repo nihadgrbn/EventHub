@@ -16,6 +16,11 @@ namespace EventHub.Infrastructure.Persistence.Configurations
             builder.Property(e => e.Title).HasMaxLength(200).IsRequired();
             builder.Property(e => e.Description).HasMaxLength(1000);
             builder.Property(e => e.Location).HasMaxLength(200).IsRequired();
+            builder.Property(e => e.Status)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(EventHub.Domain.Enums.EventStatus.Draft)
+                .IsRequired();
             builder.HasOne(e => e.Organizer)
                 .WithMany()
                 .HasForeignKey(e => e.OrganizerId)

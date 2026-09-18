@@ -66,4 +66,20 @@ public sealed class TicketRepository : ITicketRepository
 
         return (tickets, totalCount);
     }
+
+    public async Task<IReadOnlyDictionary<Guid, int>> GetCountsByTicketTypeIdsAsync(
+        IReadOnlyCollection<Guid> ticketTypeIds,
+        CancellationToken cancellationToken)
+    {
+        if (ticketTypeIds.Count == 0)
+        {
+            return new Dictionary<Guid, int>();
+        }
+
+        return await _context.Tickets
+            .AsNoTracking()
+            .Where(ticket => ticketTypeIds.Contains(ticket.TicketTypeId))
+            .GroupBy(ticket => ticket.TicketTypeId)
+            .ToDictionaryAsync(group => group.Key, group => group.Count(), cancellationToken);
+    }
 }

@@ -11,6 +11,7 @@ namespace EventHub.Domain.Entities
         public string Description { get; set; }= string.Empty;
         public DateTime Date {  get; set; }
         public string Location { get; set; } = string.Empty;
+        public Enums.EventStatus Status { get; set; } = Enums.EventStatus.Draft;
 
         public Guid OrganizerId {  get; set; }
         public User? Organizer { get; set; }

@@ -1,6 +1,7 @@
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Domain.Constants;
+using EventHub.Domain.Enums;
 using MediatR;
 
 namespace EventHub.Application.Events.Commands.UpdateEvent;
@@ -37,6 +38,11 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand>
             && @event.OrganizerId != currentUserId)
         {
             throw new ForbiddenException("You can only update your own events.");
+        }
+
+        if (@event.Status is EventStatus.Cancelled or EventStatus.Completed)
+        {
+            throw new ConflictException("Cancelled or completed events cannot be edited.");
         }
 
         @event.Title = request.Title;

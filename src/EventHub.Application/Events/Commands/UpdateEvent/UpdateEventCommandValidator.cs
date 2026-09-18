@@ -13,6 +13,9 @@ public class UpdateEventCommandValidator : AbstractValidator<UpdateEventCommand>
         RuleFor(v => v.Location)
             .NotEmpty().WithMessage("Event location is required.");
 
+        RuleFor(v => v.Description)
+            .MaximumLength(1000).WithMessage("Event description can be at most 1000 characters long.");
+
         RuleFor(v => v.Date)
             .GreaterThan(DateTime.UtcNow).WithMessage("Event date must be in the future.");
 

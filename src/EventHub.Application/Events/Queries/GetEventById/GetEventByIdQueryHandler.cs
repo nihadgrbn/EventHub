@@ -11,10 +11,12 @@ namespace EventHub.Application.Events.Queries.GetEventById
     public class GetEventByIdQueryHandler : IRequestHandler<GetEventByIdQuery, EventResponse>
     {
         private readonly IEventRepository _eventRepository;
+        private readonly ICurrentUserService _currentUserService;
 
-        public GetEventByIdQueryHandler(IEventRepository eventRepository)
+        public GetEventByIdQueryHandler(IEventRepository eventRepository, ICurrentUserService currentUserService)
         {
             _eventRepository = eventRepository;
+            _currentUserService = currentUserService;
         }
 
         public async Task<EventResponse> Handle(GetEventByIdQuery request, CancellationToken cancellationToken)
@@ -24,12 +26,20 @@ namespace EventHub.Application.Events.Queries.GetEventById
             if (@event is null)
                 throw new NotFoundException("Event not found.");
 
+            if (@event.Status != EventHub.Domain.Enums.EventStatus.Published
+                && !_currentUserService.IsInRole(EventHub.Domain.Constants.Roles.Admin)
+                && @event.OrganizerId != _currentUserService.UserId)
+            {
+                throw new NotFoundException("Event not found.");
+            }
+
             return new EventResponse(
                 @event.Id,
                 @event.Title,
                 @event.Description,
                 @event.Date,
                 @event.Location,
+                @event.Status,
                 @event.OrganizerId,
                 @event.Organizer is null
                     ? string.Empty

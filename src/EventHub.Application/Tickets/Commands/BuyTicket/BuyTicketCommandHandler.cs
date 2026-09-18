@@ -65,6 +65,11 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
         var eventEntity = await _eventRepository.GetByIdAsync(request.EventId, cancellationToken)
             ?? throw new NotFoundException("Event not found.");
 
+        if (eventEntity.Status != EventHub.Domain.Enums.EventStatus.Published)
+        {
+            throw new ConflictException("Tickets can only be purchased for published events.");
+        }
+
         var purchasedAt = DateTime.UtcNow;
 
         var purchaseId = Guid.NewGuid();

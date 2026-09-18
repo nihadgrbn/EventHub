@@ -12,4 +12,7 @@ public interface ITicketRepository
         CancellationToken cancellationToken);
     Task<(IEnumerable<Ticket> Tickets, int TotalCount)> GetOrdersByOrganizerIdAsync(
     Guid organizerId, int pageNumber, int pageSize, CancellationToken cancellationToken);
+    Task<IReadOnlyDictionary<Guid, int>> GetCountsByTicketTypeIdsAsync(
+        IReadOnlyCollection<Guid> ticketTypeIds,
+        CancellationToken cancellationToken);
 }

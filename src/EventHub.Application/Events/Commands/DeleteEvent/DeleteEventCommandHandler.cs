@@ -10,15 +10,18 @@ public class DeleteEventCommandHandler : IRequestHandler<DeleteEventCommand>
     private readonly IEventRepository _eventRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ITicketRepository _ticketRepository;
 
     public DeleteEventCommandHandler(
         IEventRepository eventRepository,
         IUnitOfWork unitOfWork,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        ITicketRepository ticketRepository)
     {
         _eventRepository = eventRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _ticketRepository = ticketRepository;
     }
 
     public async Task Handle(DeleteEventCommand request, CancellationToken cancellationToken)
@@ -37,6 +40,19 @@ public class DeleteEventCommandHandler : IRequestHandler<DeleteEventCommand>
             && @event.OrganizerId != currentUserId)
         {
             throw new ForbiddenException("You can only delete your own events.");
+        }
+
+        if (@event.Status != EventHub.Domain.Enums.EventStatus.Draft)
+        {
+            throw new ConflictException("Only draft events can be deleted. Cancel a published event instead.");
+        }
+
+        var salesByTicketTypeId = await _ticketRepository.GetCountsByTicketTypeIdsAsync(
+            @event.TicketTypes.Select(ticketType => ticketType.Id).ToArray(), cancellationToken);
+
+        if (salesByTicketTypeId.Values.Sum() > 0)
+        {
+            throw new ConflictException("An event with sold tickets cannot be deleted.");
         }
 
         _eventRepository.Delete(@event);

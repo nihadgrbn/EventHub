@@ -2,6 +2,7 @@ using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Application.Tickets.Commands.BuyTicket;
 using EventHub.Domain.Entities;
+using EventHub.Domain.Enums;
 using Moq;
 using Xunit;
 
@@ -25,7 +26,7 @@ public sealed class BuyTicketCommandHandlerTests
         var eventId = Guid.NewGuid();
         var ticketTypeId = Guid.NewGuid();
         var attendee = new User { Id = attendeeId, FirstName = "Test", LastName = "User", Email = "test@example.com" };
-        var eventEntity = new Event { Id = eventId, Title = "Test event", Date = DateTime.UtcNow.AddDays(1) };
+        var eventEntity = new Event { Id = eventId, Title = "Test event", Date = DateTime.UtcNow.AddDays(1), Status = EventStatus.Published };
         var ticketType = new TicketType { Id = ticketTypeId, EventId = eventId, Name = "Standard", Price = 25m };
 
         _currentUser.SetupGet(service => service.UserId).Returns(attendeeId);

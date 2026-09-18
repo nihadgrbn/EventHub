@@ -60,7 +60,7 @@ namespace EventHub.Infrastructure.Persistence.Repositories
             var totalTicketsSold = await ticketsQuery.CountAsync(cancellationToken);
 
             var totalRevenue = await ticketsQuery
-                .SumAsync(t => t.TicketType!.Price, cancellationToken);
+                .SumAsync(t => t.PriceAtPurchase, cancellationToken);
 
             return new OrganizerStatisticsDto(totalEvents, totalTicketsSold, totalRevenue, upcomingEvents);
         }
@@ -77,6 +77,7 @@ namespace EventHub.Infrastructure.Persistence.Repositories
             var query = _context.Events
                 .Include(e => e.Organizer)
                 .Include(e => e.TicketTypes)
+                .Where(e => e.Status == EventHub.Domain.Enums.EventStatus.Published)
                 .AsNoTracking();
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
