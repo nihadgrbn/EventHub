@@ -23,10 +23,10 @@ public sealed class TicketsController : ControllerBase
     }
     [HttpGet("my-tickets")]
     [Authorize(Roles = Roles.Attendee)]
-    public async Task<IActionResult> GetMyTickets()
+    public async Task<IActionResult> GetMyTickets(CancellationToken cancellationToken)
     {
         var query = new GetMyTicketsQuery();
-        var result = await _sender.Send(query);
+        var result = await _sender.Send(query,cancellationToken);
 
         return Ok(result);
     }

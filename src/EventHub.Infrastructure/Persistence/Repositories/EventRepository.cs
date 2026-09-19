@@ -1,6 +1,7 @@
 ﻿using EventHub.Application.Common.Interfaces;
 using EventHub.Application.Organizers.Queries.GetStatistics;
 using EventHub.Domain.Entities;
+using EventHub.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 
@@ -68,7 +69,7 @@ namespace EventHub.Infrastructure.Persistence.Repositories
         public async Task<(IEnumerable<Event> Events, int TotalCount)> GetPagedEventsAsync(
     string? searchTerm,
     string? location,
-    string? category,
+    EventCategory? category,
     DateTime? dateFrom,
     DateTime? dateTo,
     string? sortBy,
@@ -93,9 +94,9 @@ namespace EventHub.Infrastructure.Persistence.Repositories
                 query = query.Where(e => e.Location.Contains(location));
             }
 
-            if (!string.IsNullOrWhiteSpace(category))
+            if (category.HasValue)
             {
-                query = query.Where(e => e.Category == category);
+                query = query.Where(e => e.Category == category.Value);
             }
 
             if (dateFrom.HasValue)

@@ -19,9 +19,7 @@ namespace EventHub.Application.Events.Commands.CreateEvent
                 .MaximumLength(200).WithMessage("Event location can be at most 200 characters long.");
 
             RuleFor(v => v.Category)
-                .Cascade(CascadeMode.Stop)
-                .Must(category => !string.IsNullOrWhiteSpace(category)).WithMessage("Event category is required.")
-                .MaximumLength(100).WithMessage("Event category can be at most 100 characters long.");
+                .IsInEnum().WithMessage("Invalid event category selected.");
 
             RuleFor(v => v.Address)
                 .Cascade(CascadeMode.Stop)

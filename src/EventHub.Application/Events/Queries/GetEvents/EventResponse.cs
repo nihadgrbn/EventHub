@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using EventHub.Domain.Enums;
 
 namespace EventHub.Application.Events.Queries.GetEvents
 {
@@ -10,7 +11,7 @@ namespace EventHub.Application.Events.Queries.GetEvents
         string Description,
         DateTime Date,
         string Location,
-        string Category,
+        EventCategory Category,
         string Address,
         string? PosterImageUrl,
         decimal? Latitude,

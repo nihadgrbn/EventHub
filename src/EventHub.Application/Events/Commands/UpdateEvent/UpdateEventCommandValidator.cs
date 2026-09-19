@@ -16,8 +16,8 @@ public class UpdateEventCommandValidator : AbstractValidator<UpdateEventCommand>
         RuleFor(v => v.Description)
             .MaximumLength(1000).WithMessage("Event description can be at most 1000 characters long.");
 
-        RuleFor(v => v.Category).Must(value => !string.IsNullOrWhiteSpace(value)).WithMessage("Event category is required.")
-            .MaximumLength(100).WithMessage("Event category can be at most 100 characters long.");
+        RuleFor(v => v.Category)
+            .IsInEnum().WithMessage("Invalid event category selected.");
         RuleFor(v => v.Address).Must(value => !string.IsNullOrWhiteSpace(value)).WithMessage("Event address is required.")
             .MaximumLength(300).WithMessage("Event address can be at most 300 characters long.");
         RuleFor(v => v.PosterImageUrl).MaximumLength(2048).WithMessage("Poster URL can be at most 2048 characters long.")

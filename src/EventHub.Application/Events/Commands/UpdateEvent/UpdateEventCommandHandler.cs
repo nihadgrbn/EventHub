@@ -49,7 +49,7 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand>
         @event.Description = request.Description;
         @event.Date = request.Date;
         @event.Location = request.Location;
-        @event.Category = request.Category.Trim();
+        @event.Category = request.Category;
         @event.Address = request.Address.Trim();
         @event.PosterImageUrl = request.PosterImageUrl?.Trim();
         @event.Latitude = request.Latitude;

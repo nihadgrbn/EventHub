@@ -1,4 +1,5 @@
 using EventHub.Application.Events.Commands.CreateEvent;
+using EventHub.Domain.Enums;
 using Xunit;
 
 namespace EventHub.Application.Tests.Events;
@@ -60,7 +61,7 @@ public sealed class CreateEventCommandValidatorTests
         "A community meetup for developers.",
         DateTime.UtcNow.AddDays(7),
         "Baku",
-        "Technology",
+        EventCategory.Other, 
         "1 Neftchilar Avenue, Baku",
         "https://cdn.example.com/poster.png",
         40.4093m,

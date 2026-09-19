@@ -3,6 +3,7 @@ using EventHub.Domain.Entities;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using EventHub.Domain.Enums;
 
 namespace EventHub.Application.Common.Interfaces
 {
@@ -16,7 +17,7 @@ namespace EventHub.Application.Common.Interfaces
         Task<(IEnumerable<Event> Events, int TotalCount)> GetPagedEventsAsync(
             string? searchTerm, 
             string? location, 
-            string? category,
+            EventCategory? category,
             DateTime? dateFrom,
             DateTime? dateTo,
             string? sortBy, 

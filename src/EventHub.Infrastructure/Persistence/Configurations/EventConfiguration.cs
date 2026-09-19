@@ -16,7 +16,10 @@ namespace EventHub.Infrastructure.Persistence.Configurations
             builder.Property(e => e.Title).HasMaxLength(200).IsRequired();
             builder.Property(e => e.Description).HasMaxLength(1000);
             builder.Property(e => e.Location).HasMaxLength(200).IsRequired();
-            builder.Property(e => e.Category).HasMaxLength(100).IsRequired();
+            builder.Property(e => e.Category)
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .IsRequired();
             builder.Property(e => e.Address).HasMaxLength(300).IsRequired();
             builder.Property(e => e.PosterImageUrl).HasMaxLength(2048);
             builder.Property(e => e.Latitude).HasColumnType("decimal(9,6)");

@@ -10,7 +10,7 @@ namespace EventHub.Api.Controllers
     [Authorize(Roles = Roles.OrganizerOrAdmin)]
     [ApiController]
     [Route("api/[controller]")]
-    public class OrganizersController : ControllerBase
+    public sealed class OrganizersController : ControllerBase
     {
         private readonly ISender _sender;
 
@@ -18,19 +18,19 @@ namespace EventHub.Api.Controllers
         {
             _sender = sender;
         }
+
         [HttpGet("orders")]
-        public async Task<IActionResult> GetOrders([FromQuery] GetOrganizerOrdersQuery query)
+        public async Task<IActionResult> GetOrders([FromQuery] GetOrganizerOrdersQuery query, CancellationToken cancellationToken)
         {
-            var result = await _sender.Send(query);
+            var result = await _sender.Send(query, cancellationToken);
             return Ok(result);
         }
 
-        // GET /api/organizers/statistics
         [HttpGet("statistics")]
-        public async Task<IActionResult> GetStatistics()
+        public async Task<IActionResult> GetStatistics(CancellationToken cancellationToken)
         {
             var query = new GetOrganizerStatisticsQuery();
-            var result = await _sender.Send(query);
+            var result = await _sender.Send(query, cancellationToken);
 
             return Ok(result);
         }

@@ -1,6 +1,7 @@
 ﻿using EventHub.Application.Common.Interfaces;
 using EventHub.Application.Common.Exceptions;
 using EventHub.Domain.Entities;
+using EventHub.Domain.Enums;
 using MediatR;
 
 namespace EventHub.Application.Events.Commands.CreateEvent
@@ -32,12 +33,14 @@ namespace EventHub.Application.Events.Commands.CreateEvent
                 Description = request.Description,
                 Date = request.Date,
                 Location = request.Location,
-                Category = request.Category.Trim(),
+                Category = request.Category, 
                 Address = request.Address.Trim(),
                 PosterImageUrl = request.PosterImageUrl?.Trim(),
                 Latitude = request.Latitude,
                 Longitude = request.Longitude,
                 OrganizerId = userId,
+                Status = EventStatus.Draft,
+
                 TicketTypes = request.TicketTypes.Select(t => new TicketType
                 {
                     Name = t.Name,

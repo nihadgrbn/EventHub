@@ -1,4 +1,5 @@
 ﻿using EventHub.Application.Common.Models;
+using EventHub.Domain.Enums;
 using MediatR;
 
 namespace EventHub.Application.Events.Queries.GetEvents
@@ -6,7 +7,7 @@ namespace EventHub.Application.Events.Queries.GetEvents
     public record GetEventsQuery(
         string? SearchTerm = null,
         string? Location = null,
-        string? Category = null,
+        EventCategory? Category = null,
         DateTime? DateFrom = null,
         DateTime? DateTo = null,
         string? SortBy = "date",      

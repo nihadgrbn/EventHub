@@ -1,5 +1,6 @@
 using MediatR;
 using System.Text.Json.Serialization;
+using EventHub.Domain.Enums;
 
 namespace EventHub.Application.Events.Commands.UpdateEvent;
 
@@ -8,7 +9,7 @@ public record UpdateEventCommand(
     string Description,
     DateTime Date,
     string Location,
-    string Category,
+    EventCategory Category, 
     string Address,
     string? PosterImageUrl,
     decimal? Latitude,

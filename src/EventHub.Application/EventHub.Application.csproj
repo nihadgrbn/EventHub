@@ -12,6 +12,10 @@
     <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Events\Commands\PublishEvent\" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
