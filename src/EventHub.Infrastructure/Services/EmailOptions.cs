@@ -9,4 +9,5 @@ public sealed class EmailOptions
     public required string SenderName { get; init; }
     public required string SenderEmail { get; init; }
     public required string Password { get; init; }
+    public required string VerificationUrl { get; init; }
 }

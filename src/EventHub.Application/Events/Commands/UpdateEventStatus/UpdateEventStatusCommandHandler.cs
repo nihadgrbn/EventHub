@@ -54,7 +54,6 @@ public sealed class UpdateEventStatusCommandHandler : IRequestHandler<UpdateEven
             (EventStatus.Draft, EventStatus.Published) when eventDate > DateTime.UtcNow => true,
             (EventStatus.Draft, EventStatus.Cancelled) => true,
             (EventStatus.Published, EventStatus.Cancelled) when eventDate > DateTime.UtcNow => true,
-            (EventStatus.Published, EventStatus.Completed) when eventDate <= DateTime.UtcNow => true,
             _ => false
         };
 

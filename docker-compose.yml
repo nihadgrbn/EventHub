@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: eventhub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-EventHubDb}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - eventhub-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eventhub-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_HTTP_PORTS: 8080
+      Database__ApplyMigrations: ${DATABASE_APPLY_MIGRATIONS:-true}
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:-EventHubDb};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      Jwt__Issuer: ${JWT_ISSUER:-EventHubApi}
+      Jwt__Audience: ${JWT_AUDIENCE:-EventHubClient}
+      Jwt__SecretKey: ${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set in .env}
+      EmailSettings__SmtpServer: ${SMTP_SERVER:-smtp.gmail.com}
+      EmailSettings__SmtpPort: ${SMTP_PORT:-465}
+      EmailSettings__SenderName: ${SMTP_SENDER_NAME:-EventHub Support}
+      EmailSettings__SenderEmail: ${SMTP_SENDER_EMAIL:?SMTP_SENDER_EMAIL must be set in .env}
+      EmailSettings__Password: ${SMTP_PASSWORD:?SMTP_PASSWORD must be set in .env}
+      EmailSettings__VerificationUrl: ${EMAIL_VERIFICATION_URL:-http://localhost:8080/api/Auth/verify-email}
+      EmailSettings__PasswordResetUrl: ${PASSWORD_RESET_URL:-http://localhost:3000/reset-password}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      - eventhub-dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
+
+volumes:
+  eventhub-postgres-data:
+  eventhub-dataprotection-keys:

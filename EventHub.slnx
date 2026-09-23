@@ -3,6 +3,7 @@
   <Project Path="src/EventHub.Application/EventHub.Application.csproj" />
   <Project Path="src/EventHub.Domain/EventHub.Domain.csproj" />
   <Project Path="src/EventHub.Infrastructure/EventHub.Infrastructure.csproj" />
+  <Project Path="tests/EventHub.Api.IntegrationTests/EventHub.Api.IntegrationTests.csproj" />
   <Project Path="tests/EventHub.Application.Tests/EventHub.Application.Tests.csproj" />
   <Project Path="tests/EventHub.Infrastructure.Tests/EventHub.Infrastructure.Tests.csproj" />
 </Solution>

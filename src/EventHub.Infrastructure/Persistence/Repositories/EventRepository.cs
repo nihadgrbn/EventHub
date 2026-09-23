@@ -44,6 +44,22 @@ namespace EventHub.Infrastructure.Persistence.Repositories
         {
             _context.Events.Remove(@event);
         }
+
+        public async Task<int> CompleteExpiredPublishedEventsAsync(
+            DateTime utcNow,
+            CancellationToken cancellationToken)
+        {
+            return await _context.Events
+                .Where(e =>
+                    e.Status == EventStatus.Published &&
+                    e.Date <= utcNow)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(e => e.Status, EventStatus.Completed)
+                        .SetProperty(e => e.UpdatedAt, utcNow),
+                    cancellationToken);
+        }
+
         public async Task<OrganizerStatisticsDto> GetOrganizerStatisticsAsync(Guid organizerId, CancellationToken cancellationToken)
         {
             var now = DateTime.UtcNow;

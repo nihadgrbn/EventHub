@@ -16,6 +16,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISecureTokenService _secureTokenService;
     private readonly IEmailService _emailService;
+    private readonly IEmailVerificationLinkBuilder _verificationLinkBuilder;
 
     public RegisterCommandHandler(
         IUserRepository userRepository,
@@ -23,7 +24,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
         IJwtProvider jwtProvider,
         IUnitOfWork unitOfWork,
         ISecureTokenService secureTokenService,
-        IEmailService emailService)
+        IEmailService emailService,
+        IEmailVerificationLinkBuilder verificationLinkBuilder)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
@@ -31,6 +33,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
         _unitOfWork = unitOfWork;
         _secureTokenService = secureTokenService;
         _emailService = emailService;
+        _verificationLinkBuilder = verificationLinkBuilder;
     }
 
     public async Task<AuthResponse> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -62,8 +65,7 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand, AuthRespo
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var verificationUrl = "https://localhost:7248/api/Auth/verify-email";
-        var verificationLink = $"{verificationUrl}?token={Uri.EscapeDataString(verificationToken)}";
+        var verificationLink = _verificationLinkBuilder.Build(verificationToken);
         var emailBody = $"<h2>Verify your email</h2><p>Hello {System.Net.WebUtility.HtmlEncode(user.FirstName)},</p><p><a href=\"{verificationLink}\">Verify email</a></p><p>This link expires in 24 hours.</p>";
         await _emailService.SendEmailAsync(user.Email, "EventHub email verification", emailBody);
 

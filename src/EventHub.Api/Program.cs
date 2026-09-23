@@ -4,6 +4,7 @@ using EventHub.Application.Common.Behaviors;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Application.Events.Commands.CreateEvent;
 using EventHub.Infrastructure.Authentication;
+using EventHub.Infrastructure.BackgroundServices;
 using EventHub.Infrastructure.Persistence;
 using EventHub.Infrastructure.Persistence.Repositories;
 using EventHub.Infrastructure.Services;
@@ -28,6 +29,10 @@ builder.Services.Configure<TokenOptions>(
     builder.Configuration.GetSection("TokenOptions"));
 builder.Services.AddOptions<EmailOptions>()
     .Bind(builder.Configuration.GetSection(EmailOptions.SectionName))
+    .Validate(options =>
+        Uri.TryCreate(options.VerificationUrl, UriKind.Absolute, out var uri) &&
+        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps),
+        "EmailSettings:VerificationUrl must be an absolute HTTP or HTTPS URL.")
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
@@ -53,6 +58,7 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddSingleton<IJwtProvider, JwtProvider>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 builder.Services.AddSingleton<ISecureTokenService, SecureTokenService>();
+builder.Services.AddSingleton<IEmailVerificationLinkBuilder, EmailVerificationLinkBuilder>();
 
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -63,6 +69,7 @@ builder.Services.AddScoped<IOutboxRepository, OutboxRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 builder.Services.AddHostedService<OutboxProcessorBackgroundService>();
+builder.Services.AddHostedService<EventStatusBackgroundService>();
 
 builder.Services.AddMediatR(cfg => {
     cfg.RegisterServicesFromAssembly(typeof(CreateEventCommand).Assembly);
@@ -121,3 +128,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
+
+public partial class Program;

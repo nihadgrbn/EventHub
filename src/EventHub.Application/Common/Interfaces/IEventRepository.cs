@@ -14,6 +14,9 @@ namespace EventHub.Application.Common.Interfaces
         Task<Event?> GetByIdAsync(Guid id,CancellationToken cancellationToken);
         void Update(Event @event);
         void Delete(Event @event);
+        Task<int> CompleteExpiredPublishedEventsAsync(
+            DateTime utcNow,
+            CancellationToken cancellationToken);
         Task<(IEnumerable<Event> Events, int TotalCount)> GetPagedEventsAsync(
             string? searchTerm, 
             string? location, 
