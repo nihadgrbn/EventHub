@@ -17,9 +17,16 @@ public class GetOrganizerStatisticsQueryHandler : IRequestHandler<GetOrganizerSt
 
     public async Task<OrganizerStatisticsDto> Handle(GetOrganizerStatisticsQuery request, CancellationToken cancellationToken)
     {
-        var organizerId = _currentUserService.UserId
-            ?? throw new UnauthorizedException("You are not authorized to access this resource.");
+        var organizerId = _currentUserService.UserId;
+        if (organizerId is null)
+        {
+            throw new UnauthorizedException("You are not authorized to access this resource.");
+        }
 
-        return await _eventRepository.GetOrganizerStatisticsAsync(organizerId, cancellationToken);
+        var scope = _currentUserService.IsInRole(EventHub.Domain.Constants.Roles.Admin)
+            ? (Guid?)null
+            : organizerId;
+
+        return await _eventRepository.GetOrganizerStatisticsAsync(scope, cancellationToken);
     }
 }

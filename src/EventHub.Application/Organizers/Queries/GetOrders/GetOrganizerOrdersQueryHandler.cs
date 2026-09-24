@@ -18,11 +18,18 @@ public class GetOrganizerOrdersQueryHandler : IRequestHandler<GetOrganizerOrders
 
     public async Task<PaginatedList<OrganizerOrderDto>> Handle(GetOrganizerOrdersQuery request, CancellationToken cancellationToken)
     {
-        var organizerId = _currentUserService.UserId
-            ?? throw new UnauthorizedException("You are not logged in.You must be logged in to view your orders.");
+        var organizerId = _currentUserService.UserId;
+        if (organizerId is null)
+        {
+            throw new UnauthorizedException("You are not logged in.You must be logged in to view your orders.");
+        }
+
+        var scope = _currentUserService.IsInRole(EventHub.Domain.Constants.Roles.Admin)
+            ? (Guid?)null
+            : organizerId;
 
         var (tickets, totalCount) = await _ticketRepository.GetOrdersByOrganizerIdAsync(
-            organizerId, request.PageNumber, request.PageSize, cancellationToken);
+            scope, request.PageNumber, request.PageSize, cancellationToken);
 
         var orderDtos = tickets.Select(t => new OrganizerOrderDto(
             t.Id,

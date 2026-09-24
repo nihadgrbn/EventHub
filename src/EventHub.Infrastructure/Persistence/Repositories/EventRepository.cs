@@ -60,19 +60,19 @@ namespace EventHub.Infrastructure.Persistence.Repositories
                     cancellationToken);
         }
 
-        public async Task<OrganizerStatisticsDto> GetOrganizerStatisticsAsync(Guid organizerId, CancellationToken cancellationToken)
+        public async Task<OrganizerStatisticsDto> GetOrganizerStatisticsAsync(Guid? organizerId, CancellationToken cancellationToken)
         {
             var now = DateTime.UtcNow;
 
             var totalEvents = await _context.Events
-                .CountAsync(e => e.OrganizerId == organizerId, cancellationToken);
+                .CountAsync(e => organizerId == null || e.OrganizerId == organizerId, cancellationToken);
 
             var upcomingEvents = await _context.Events
-                .CountAsync(e => e.OrganizerId == organizerId && e.Date > now, cancellationToken);
+                .CountAsync(e => (organizerId == null || e.OrganizerId == organizerId) && e.Date > now, cancellationToken);
 
             var ticketsQuery = _context.Tickets
                 .Include(t => t.TicketType)
-                .Where(t => t.Event!.OrganizerId == organizerId);
+                .Where(t => organizerId == null || t.Event!.OrganizerId == organizerId);
 
             var totalTicketsSold = await ticketsQuery.CountAsync(cancellationToken);
 

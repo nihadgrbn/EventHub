@@ -35,9 +35,12 @@ public sealed class TicketsController : ControllerBase
     [Authorize(Roles = Roles.Attendee)]
     public async Task<IActionResult> BuyTicket(
         [FromBody] BuyTicketCommand command,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken)
     {
-        var ticketIds = await _sender.Send(command, cancellationToken);
+        var ticketIds = await _sender.Send(
+            command with { IdempotencyKey = idempotencyKey },
+            cancellationToken);
 
         return Ok(new
         {

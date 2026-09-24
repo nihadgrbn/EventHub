@@ -15,5 +15,9 @@ public sealed class BuyTicketCommandValidator : AbstractValidator<BuyTicketComma
         RuleFor(command => command.Quantity)
             .InclusiveBetween(1, 10)
             .WithMessage("Quantity must be between 1 and 10.");
+
+        RuleFor(command => command.IdempotencyKey)
+            .MaximumLength(100)
+            .When(command => command.IdempotencyKey is not null);
     }
 }

@@ -47,13 +47,16 @@ public sealed class TicketRepository : ITicketRepository
             .ToListAsync(cancellationToken);
     }
     public async Task<(IEnumerable<Ticket> Tickets, int TotalCount)> GetOrdersByOrganizerIdAsync(
-    Guid organizerId, int pageNumber, int pageSize, CancellationToken cancellationToken)
+        Guid? organizerId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
     {
         var query = _context.Tickets
             .Include(t => t.Event)
             .Include(t => t.TicketType)
             .Include(t => t.Attendee)
-            .Where(t => t.Event!.OrganizerId == organizerId)
+            .Where(t => organizerId == null || t.Event!.OrganizerId == organizerId)
             .AsNoTracking();
 
         var totalCount = await query.CountAsync(cancellationToken);

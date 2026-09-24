@@ -47,6 +47,31 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
         var attendeeId = _currentUserService.UserId
             ?? throw new UnauthorizedException("You must be logged in to buy a ticket.");
 
+        var idempotencyKey = request.IdempotencyKey?.Trim();
+        if (!string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            var existingPurchase = await _purchaseRepository.GetByIdempotencyKeyAsync(
+                attendeeId,
+                idempotencyKey,
+                cancellationToken);
+
+            if (existingPurchase is not null)
+            {
+                var matchesOriginalRequest = existingPurchase.Tickets.Count == request.Quantity
+                    && existingPurchase.Tickets.All(ticket =>
+                        ticket.EventId == request.EventId
+                        && ticket.TicketTypeId == request.TicketTypeId);
+
+                if (!matchesOriginalRequest)
+                {
+                    throw new ConflictException(
+                        "The idempotency key was already used for a different purchase request.");
+                }
+
+                return existingPurchase.Tickets.Select(ticket => ticket.Id).ToList();
+            }
+        }
+
         var ticketType = await _ticketTypeRepository.GetByIdAsync(
             request.TicketTypeId,
             cancellationToken);
@@ -80,6 +105,7 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
         {
             Id = purchaseId, 
             AttendeeId = attendeeId,
+            IdempotencyKey = idempotencyKey,
             PurchasedAt = purchasedAt,
             TotalAmount = ticketType.Price * request.Quantity
         };

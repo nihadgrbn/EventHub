@@ -28,7 +28,7 @@ namespace EventHub.Application.Common.Interfaces
             int pageNumber, 
             int pageSize, 
             CancellationToken cancellationToken);
-        Task<OrganizerStatisticsDto> GetOrganizerStatisticsAsync(Guid organizerId, CancellationToken cancellationToken);
+        Task<OrganizerStatisticsDto> GetOrganizerStatisticsAsync(Guid? organizerId, CancellationToken cancellationToken);
 
     }
 }
