@@ -31,25 +31,6 @@ public sealed class TicketsController : ControllerBase
         return Ok(result);
     }
 
-    [HttpPost("buy")]
-    [Authorize(Roles = Roles.Attendee)]
-    public async Task<IActionResult> BuyTicket(
-        [FromBody] BuyTicketCommand command,
-        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
-        CancellationToken cancellationToken)
-    {
-        var ticketIds = await _sender.Send(
-            command with { IdempotencyKey = idempotencyKey },
-            cancellationToken);
-
-        return Ok(new
-        {
-            Message = "Tickets purchased successfully.",
-            Quantity = ticketIds.Count,
-            TicketIds = ticketIds
-        });
-    }
-
     [HttpGet("{ticketId}/qr")]
     [Authorize(Roles = Roles.Attendee)]
     public async Task<IActionResult> GetQrCode(Guid ticketId, CancellationToken cancellationToken)

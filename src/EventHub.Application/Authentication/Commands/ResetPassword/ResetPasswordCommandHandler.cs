@@ -25,8 +25,10 @@ public sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordC
 
     public async Task Handle(ResetPasswordCommand request, CancellationToken cancellationToken)
     {
-        var user = await _users.GetByEmailAsync(request.Email, cancellationToken);
-        var tokenHash = _tokens.HashToken(request.Token);
+        var email = request.Email.Trim();
+        var token = request.Token.Trim();
+        var user = await _users.GetByEmailAsync(email, cancellationToken);
+        var tokenHash = _tokens.HashToken(token);
 
         if (user is null || user.PasswordResetTokenHash != tokenHash ||
             user.PasswordResetTokenExpires is null || user.PasswordResetTokenExpires <= DateTime.UtcNow)

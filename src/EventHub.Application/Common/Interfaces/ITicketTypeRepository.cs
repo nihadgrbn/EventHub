@@ -9,4 +9,8 @@ public interface ITicketTypeRepository
         Guid id,
         int quantity,
         CancellationToken cancellationToken);
+    Task<bool> TryIncreaseAvailableQuantityAsync(
+        Guid id,
+        int quantity,
+        CancellationToken cancellationToken);
 }

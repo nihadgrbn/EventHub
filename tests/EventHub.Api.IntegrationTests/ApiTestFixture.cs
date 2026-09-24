@@ -70,12 +70,20 @@ public sealed class FakeEmailService : IEmailService
         IReadOnlyCollection<EmailAttachment>? attachments = null,
         CancellationToken cancellationToken = default)
     {
-        _messages.Enqueue(new SentEmail(toEmail, subject, body));
+        _messages.Enqueue(new SentEmail(
+            toEmail,
+            subject,
+            body,
+            attachments?.ToArray() ?? Array.Empty<EmailAttachment>()));
         return Task.CompletedTask;
     }
 }
 
-public sealed record SentEmail(string To, string Subject, string Body);
+public sealed record SentEmail(
+    string To,
+    string Subject,
+    string Body,
+    IReadOnlyCollection<EmailAttachment> Attachments);
 
 [CollectionDefinition(Name)]
 public sealed class ApiTestCollection : ICollectionFixture<ApiTestFixture>

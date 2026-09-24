@@ -13,6 +13,14 @@ public sealed class PurchaseRepository : IPurchaseRepository
         _context = context;
     }
 
+    public async Task<Purchase?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+    {
+        return await _context.Purchases
+            .AsNoTracking()
+            .Include(purchase => purchase.Tickets)
+            .SingleOrDefaultAsync(purchase => purchase.Id == id, cancellationToken);
+    }
+
     public async Task AddAsync(Purchase purchase, CancellationToken cancellationToken)
     {
         await _context.Purchases.AddAsync(purchase, cancellationToken);
