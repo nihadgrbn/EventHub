@@ -67,6 +67,7 @@ builder.Services.AddScoped<ITicketTypeRepository, TicketTypeRepository>();
 builder.Services.AddScoped<IPurchaseRepository, PurchaseRepository>();
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
+builder.Services.AddScoped<IAdminReadRepository, AdminReadRepository>();
 builder.Services.AddScoped<IReservationExpirationService, ReservationExpirationService>();
 builder.Services.AddScoped<IOutboxRepository, OutboxRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
