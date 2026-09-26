@@ -31,8 +31,10 @@ builder.Services.AddOptions<EmailOptions>()
     .Bind(builder.Configuration.GetSection(EmailOptions.SectionName))
     .Validate(options =>
         Uri.TryCreate(options.VerificationUrl, UriKind.Absolute, out var uri) &&
-        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps),
-        "EmailSettings:VerificationUrl must be an absolute HTTP or HTTPS URL.")
+        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) &&
+        Uri.TryCreate(options.PasswordResetUrl, UriKind.Absolute, out var resetUri) &&
+        (resetUri.Scheme == Uri.UriSchemeHttp || resetUri.Scheme == Uri.UriSchemeHttps),
+        "EmailSettings:VerificationUrl and PasswordResetUrl must be absolute HTTP or HTTPS URLs.")
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
@@ -59,6 +61,7 @@ builder.Services.AddSingleton<IJwtProvider, JwtProvider>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 builder.Services.AddSingleton<ISecureTokenService, SecureTokenService>();
 builder.Services.AddSingleton<IEmailVerificationLinkBuilder, EmailVerificationLinkBuilder>();
+builder.Services.AddSingleton<IPasswordResetLinkBuilder, PasswordResetLinkBuilder>();
 
 builder.Services.AddScoped<IEventRepository, EventRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();

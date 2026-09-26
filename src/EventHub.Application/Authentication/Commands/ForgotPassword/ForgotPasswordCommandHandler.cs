@@ -11,17 +11,20 @@ namespace EventHub.Application.Authentication.Commands.ForgotPassword
     private readonly IUserRepository _users;
     private readonly ISecureTokenService _tokens;
         private readonly IEmailService _emailService;
+        private readonly IPasswordResetLinkBuilder _passwordResetLinkBuilder;
     private readonly IUnitOfWork _unitOfWork;
 
     public ForgotPasswordCommandHandler(
         IUserRepository users,
         ISecureTokenService tokens,
         IEmailService emailService,
+        IPasswordResetLinkBuilder passwordResetLinkBuilder,
         IUnitOfWork unitOfWork)
         {
         _users = users;
         _tokens = tokens;
             _emailService = emailService;
+            _passwordResetLinkBuilder = passwordResetLinkBuilder;
         _unitOfWork = unitOfWork;
         }
 
@@ -39,13 +42,7 @@ namespace EventHub.Application.Authentication.Commands.ForgotPassword
             user.PasswordResetTokenExpires = _tokens.GetPasswordResetTokenExpiry();
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            // 3. Frontend-in (və ya gələcək UI-ın) ünvanı. Hələlik bura fiktiv bir link qoyuruq.
-            // Gələcəkdə bunu appsettings.json-dan oxuyacağıq.
-            var resetUrl = "https://localhost:7248/api/Auth/reset-password-page";
-
-            // C# Uri.EscapeDataString ilə tokenin içindəki xüsusi simvolları (+, /, =) URL-ə uyğunlaşdırırıq
-            var encodedToken = Uri.EscapeDataString(resetToken);
-            var resetLink = $"{resetUrl}?email={Uri.EscapeDataString(user.Email)}&token={encodedToken}";
+            var resetLink = _passwordResetLinkBuilder.Build(user.Email, resetToken);
 
             // 4. E-poçtu göndəririk
             var emailBody = $@"

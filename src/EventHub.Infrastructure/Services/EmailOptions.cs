@@ -10,4 +10,5 @@ public sealed class EmailOptions
     public required string SenderEmail { get; init; }
     public required string Password { get; init; }
     public required string VerificationUrl { get; init; }
+    public required string PasswordResetUrl { get; init; }
 }

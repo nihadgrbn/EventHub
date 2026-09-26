@@ -39,7 +39,7 @@ services:
       EmailSettings__SenderName: ${SMTP_SENDER_NAME:-EventHub Support}
       EmailSettings__SenderEmail: ${SMTP_SENDER_EMAIL:?SMTP_SENDER_EMAIL must be set in .env}
       EmailSettings__Password: ${SMTP_PASSWORD:?SMTP_PASSWORD must be set in .env}
-      EmailSettings__VerificationUrl: ${EMAIL_VERIFICATION_URL:-http://localhost:8080/api/Auth/verify-email}
+      EmailSettings__VerificationUrl: ${EMAIL_VERIFICATION_URL:-http://localhost:3000/verify-email}
       EmailSettings__PasswordResetUrl: ${PASSWORD_RESET_URL:-http://localhost:3000/reset-password}
     ports:
       - "${API_PORT:-8080}:8080"
