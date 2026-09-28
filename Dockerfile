@@ -25,5 +25,7 @@ EXPOSE 8080
 
 COPY --from=build /app/publish .
 
+RUN mkdir -p /app/wwwroot/uploads/posters && chown -R $APP_UID:$APP_UID /app/wwwroot
+
 USER $APP_UID
 ENTRYPOINT ["dotnet", "EventHub.Api.dll"]

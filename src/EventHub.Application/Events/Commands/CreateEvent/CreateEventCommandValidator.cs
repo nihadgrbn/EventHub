@@ -29,7 +29,7 @@ namespace EventHub.Application.Events.Commands.CreateEvent
             RuleFor(v => v.PosterImageUrl)
                 .MaximumLength(2048).WithMessage("Poster URL can be at most 2048 characters long.")
                 .Must(BeSecureUrl).When(v => !string.IsNullOrWhiteSpace(v.PosterImageUrl))
-                .WithMessage("Poster URL must be an absolute HTTPS URL.");
+                .WithMessage("Poster URL must be an absolute HTTP or HTTPS URL.");
 
             RuleFor(v => v.Latitude)
                 .InclusiveBetween(-90m, 90m).When(v => v.Latitude.HasValue)
@@ -66,7 +66,7 @@ namespace EventHub.Application.Events.Commands.CreateEvent
         }
 
         private static bool BeSecureUrl(string? value) => Uri.TryCreate(value, UriKind.Absolute, out var uri)
-            && uri.Scheme == Uri.UriSchemeHttps
+            && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)
             && !string.IsNullOrWhiteSpace(uri.Host)
             && string.IsNullOrEmpty(uri.UserInfo);
     }

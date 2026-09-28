@@ -24,7 +24,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
-        if (exception is ValidationException or ConflictException or UnauthorizedException or ForbiddenException)
+        if (exception is ValidationException or ConflictException or UnauthorizedException or ForbiddenException or NotFoundException)
         {
             _logger.LogWarning(
                 "Request failed with {ExceptionType} for {Path}.",

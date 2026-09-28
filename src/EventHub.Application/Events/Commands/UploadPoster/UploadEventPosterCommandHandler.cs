@@ -1,35 +1,33 @@
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Domain.Constants;
+using EventHub.Domain.Enums;
 using MediatR;
 
-namespace EventHub.Application.Events.Commands.DeleteEvent;
+namespace EventHub.Application.Events.Commands.UploadPoster;
 
-public class DeleteEventCommandHandler : IRequestHandler<DeleteEventCommand>
+public sealed class UploadEventPosterCommandHandler : IRequestHandler<UploadEventPosterCommand, string>
 {
     private readonly IEventRepository _eventRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
-    private readonly ITicketRepository _ticketRepository;
     private readonly IFileStorageService _fileStorageService;
 
-    public DeleteEventCommandHandler(
+    public UploadEventPosterCommandHandler(
         IEventRepository eventRepository,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUserService,
-        ITicketRepository ticketRepository,
         IFileStorageService fileStorageService)
     {
         _eventRepository = eventRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
-        _ticketRepository = ticketRepository;
         _fileStorageService = fileStorageService;
     }
 
-    public async Task Handle(DeleteEventCommand request, CancellationToken cancellationToken)
+    public async Task<string> Handle(UploadEventPosterCommand request, CancellationToken cancellationToken)
     {
-        var @event = await _eventRepository.GetByIdAsync(request.Id, cancellationToken);
+        var @event = await _eventRepository.GetByIdAsync(request.EventId, cancellationToken);
 
         if (@event is null)
         {
@@ -37,33 +35,35 @@ public class DeleteEventCommandHandler : IRequestHandler<DeleteEventCommand>
         }
 
         var currentUserId = _currentUserService.UserId
-            ?? throw new UnauthorizedException("A valid user is required to delete an event.");
+            ?? throw new UnauthorizedException("A valid user is required to upload an event poster.");
 
         if (!_currentUserService.IsInRole(Roles.Admin)
             && @event.OrganizerId != currentUserId)
         {
-            throw new ForbiddenException("You can only delete your own events.");
+            throw new ForbiddenException("You can only upload posters for your own events.");
         }
 
-        if (@event.Status != EventHub.Domain.Enums.EventStatus.Draft)
+        if (@event.Status is EventStatus.Cancelled or EventStatus.Completed)
         {
-            throw new ConflictException("Only draft events can be deleted. Cancel a published event instead.");
+            throw new ConflictException("Cancelled or completed events cannot be edited.");
         }
 
-        var salesByTicketTypeId = await _ticketRepository.GetCountsByTicketTypeIdsAsync(
-            @event.TicketTypes.Select(ticketType => ticketType.Id).ToArray(), cancellationToken);
-
-        if (salesByTicketTypeId.Values.Sum() > 0)
-        {
-            throw new ConflictException("An event with sold tickets cannot be deleted.");
-        }
-
+        // Clean up previous poster if it exists to avoid orphaned files
         if (!string.IsNullOrWhiteSpace(@event.PosterImageUrl))
         {
             await _fileStorageService.DeleteFileAsync(@event.PosterImageUrl, cancellationToken);
         }
 
-        _eventRepository.Delete(@event);
+        var posterUrl = await _fileStorageService.SavePosterAsync(
+            request.FileStream,
+            request.FileName,
+            request.ContentType,
+            cancellationToken);
+
+        @event.PosterImageUrl = posterUrl;
+        _eventRepository.Update(@event);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return posterUrl;
     }
 }

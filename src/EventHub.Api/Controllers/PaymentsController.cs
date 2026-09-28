@@ -1,9 +1,11 @@
+using EventHub.Api.Constants;
 using EventHub.Application.Payments.Commands.CreateReservation;
 using EventHub.Application.Payments.Commands.ConfirmReservation;
 using EventHub.Domain.Constants;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Hosting;
 
 namespace EventHub.Api.Controllers;
@@ -23,6 +25,7 @@ public sealed class PaymentsController : ControllerBase
     }
 
     [HttpPost("reservations")]
+    [EnableRateLimiting(RateLimitPolicies.ReservationStrict)]
     public async Task<IActionResult> CreateReservation(
         [FromBody] CreateReservationCommand command,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,

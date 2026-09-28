@@ -1,8 +1,11 @@
 ﻿using EventHub.Application.Events.Commands.CreateEvent;
+using EventHub.Api.Constants;
 using EventHub.Application.Events.Commands.DeleteEvent;
+using EventHub.Application.Events.Commands.DeletePoster;
 using EventHub.Application.Events.Commands.UpdateEvent;
 using EventHub.Application.Events.Commands.UpdateEventStatus;
 using EventHub.Application.Events.Commands.UpdateTicketTypes;
+using EventHub.Application.Events.Commands.UploadPoster;
 using EventHub.Domain.Enums;
 using EventHub.Application.Events.Queries.GetEventById;
 using EventHub.Application.Events.Queries.GetEvents;
@@ -10,6 +13,7 @@ using EventHub.Domain.Constants;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EventHub.Api.Controllers
 {
@@ -70,6 +74,38 @@ namespace EventHub.Api.Controllers
         public async Task<IActionResult> UpdateTicketTypes(Guid id, [FromBody] List<UpdateTicketTypeDto> ticketTypes, CancellationToken cancellationToken)
         {
             await _sender.Send(new UpdateEventTicketTypesCommand(id, ticketTypes), cancellationToken);
+            return NoContent();
+        }
+
+        [HttpPost("{id}/poster")]
+        [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        [EnableRateLimiting(RateLimitPolicies.MediaUpload)]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadPoster([FromRoute] Guid id, IFormFile? file, CancellationToken cancellationToken)
+        {
+            if (file is null || file.Length == 0)
+            {
+                return BadRequest(new ProblemDetails
+                {
+                    Status = StatusCodes.Status400BadRequest,
+                    Title = "One or more validation errors occurred.",
+                    Extensions = { ["errors"] = new Dictionary<string, string[]> { ["File"] = ["File is required."] } }
+                });
+            }
+
+            await using var stream = file.OpenReadStream();
+            var command = new UploadEventPosterCommand(id, stream, file.FileName, file.ContentType, file.Length);
+            var posterUrl = await _sender.Send(command, cancellationToken);
+
+            return Ok(new { posterUrl });
+        }
+
+        [HttpDelete("{id}/poster")]
+        [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        [EnableRateLimiting(RateLimitPolicies.MediaUpload)]
+        public async Task<IActionResult> DeletePoster(Guid id, CancellationToken cancellationToken)
+        {
+            await _sender.Send(new DeleteEventPosterCommand(id), cancellationToken);
             return NoContent();
         }
 

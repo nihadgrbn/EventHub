@@ -21,8 +21,8 @@ public class UpdateEventCommandValidator : AbstractValidator<UpdateEventCommand>
         RuleFor(v => v.Address).Must(value => !string.IsNullOrWhiteSpace(value)).WithMessage("Event address is required.")
             .MaximumLength(300).WithMessage("Event address can be at most 300 characters long.");
         RuleFor(v => v.PosterImageUrl).MaximumLength(2048).WithMessage("Poster URL can be at most 2048 characters long.")
-            .Must(value => Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps && string.IsNullOrEmpty(uri.UserInfo))
-            .When(v => !string.IsNullOrWhiteSpace(v.PosterImageUrl)).WithMessage("Poster URL must be an absolute HTTPS URL.");
+            .Must(value => Uri.TryCreate(value, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp) && string.IsNullOrEmpty(uri.UserInfo))
+            .When(v => !string.IsNullOrWhiteSpace(v.PosterImageUrl)).WithMessage("Poster URL must be an absolute HTTP or HTTPS URL.");
         RuleFor(v => v.Latitude).InclusiveBetween(-90m, 90m).When(v => v.Latitude.HasValue);
         RuleFor(v => v.Longitude).InclusiveBetween(-180m, 180m).When(v => v.Longitude.HasValue);
         RuleFor(v => v).Must(v => v.Latitude.HasValue == v.Longitude.HasValue)

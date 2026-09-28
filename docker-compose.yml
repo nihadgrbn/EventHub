@@ -45,7 +45,9 @@ services:
       - "${API_PORT:-8080}:8080"
     volumes:
       - eventhub-dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
+      - eventhub-media-data:/app/wwwroot/uploads
 
 volumes:
   eventhub-postgres-data:
   eventhub-dataprotection-keys:
+  eventhub-media-data:

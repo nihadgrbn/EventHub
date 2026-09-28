@@ -1,4 +1,5 @@
 ﻿using EventHub.Application.Authentication.Command.Register;
+using EventHub.Api.Constants;
 using EventHub.Application.Authentication.Commands.Logout;
 using EventHub.Application.Authentication.Commands.Refresh;
 using EventHub.Application.Authentication.Queries.Login;
@@ -7,6 +8,7 @@ using EventHub.Application.Authentication.Commands.ResetPassword;
 using EventHub.Application.Authentication.Commands.VerifyEmail;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace EventHub.Api.Controllers;
 
@@ -22,6 +24,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
+    [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
     public async Task<IActionResult> Register([FromBody] RegisterCommand command)
     {
         var response = await _sender.Send(command);
@@ -34,6 +37,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
     public async Task<IActionResult> Login([FromBody] LoginQuery query)
     {
         var response = await _sender.Send(query);
@@ -46,6 +50,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
     public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand command)
     {
         var response = await _sender.Send(command);
@@ -65,6 +70,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("forgot-password")]
+    [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordCommand command)
     {
         await _sender.Send(command);
@@ -72,6 +78,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("reset-password")]
+    [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordCommand command)
     {
         await _sender.Send(command);
@@ -100,6 +107,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("reset-password-page")]
+    [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
     public async Task<IActionResult> ResetPasswordPage(
         [FromForm] string email,
         [FromForm] string token,
