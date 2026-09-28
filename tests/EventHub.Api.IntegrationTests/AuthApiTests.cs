@@ -9,15 +9,21 @@ namespace EventHub.Api.IntegrationTests;
 [Collection(ApiTestCollection.Name)]
 public sealed class AuthApiTests(ApiTestFixture fixture)
 {
-    private readonly HttpClient _client = fixture.CreateClient();
+    private HttpClient CreateTestClient()
+    {
+        var client = fixture.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", $"198.51.100.{Random.Shared.Next(1, 250)}");
+        return client;
+    }
 
     [Fact]
     public async Task Register_VerifyEmailAndLogin_CompletesSuccessfully()
     {
+        using var client = CreateTestClient();
         var email = $"user-{Guid.NewGuid():N}@example.com";
         const string password = "Password1!";
 
-        var registerResponse = await _client.PostAsJsonAsync("/api/Auth/register", new
+        var registerResponse = await client.PostAsJsonAsync("/api/Auth/register", new
         {
             firstName = "Integration",
             lastName = "Tester",
@@ -29,16 +35,19 @@ public sealed class AuthApiTests(ApiTestFixture fixture)
         Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
 
         var verificationEmail = Assert.Single(
-            fixture.EmailService.Messages.Where(message => message.To == email));
+            fixture.EmailService.Messages, message => message.To == email);
         var token = ExtractToken(verificationEmail.Body);
 
-        var verifyResponse = await _client.GetAsync(
-            $"/api/Auth/verify-email?token={Uri.EscapeDataString(token)}");
+        var verifyResponse = await client.PostAsJsonAsync("/api/Auth/verify-email", new
+        {
+            token
+        });
 
         Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
-        Assert.Contains("Email verified successfully", await verifyResponse.Content.ReadAsStringAsync());
+        using var verifyJson = JsonDocument.Parse(await verifyResponse.Content.ReadAsStringAsync());
+        Assert.Equal("Email verified successfully.", verifyJson.RootElement.GetProperty("message").GetString());
 
-        var loginResponse = await _client.PostAsJsonAsync("/api/Auth/login", new
+        var loginResponse = await client.PostAsJsonAsync("/api/Auth/login", new
         {
             email,
             password
@@ -53,8 +62,11 @@ public sealed class AuthApiTests(ApiTestFixture fixture)
     [Fact]
     public async Task VerifyEmail_WithInvalidToken_ReturnsUnauthorized()
     {
-        var response = await _client.GetAsync(
-            "/api/Auth/verify-email?token=invalid-integration-test-token");
+        using var client = CreateTestClient();
+        var response = await client.PostAsJsonAsync("/api/Auth/verify-email", new
+        {
+            token = "invalid-integration-test-token"
+        });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

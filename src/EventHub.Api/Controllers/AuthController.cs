@@ -27,12 +27,11 @@ public class AuthController : ControllerBase
     [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
     public async Task<IActionResult> Register([FromBody] RegisterCommand command)
     {
-        var response = await _sender.Send(command);
+        await _sender.Send(command);
 
         return Ok(new
         {
-            Message = "Register successful",
-            Data = response
+            Message = "Registration successful. Please check your email to verify your account before logging in."
         });
     }
 
@@ -85,52 +84,11 @@ public class AuthController : ControllerBase
         return Ok(new { Message = "Password reset successfully." });
     }
 
-    [HttpGet("reset-password-page")]
-    public IActionResult ResetPasswordPage([FromQuery] string email, [FromQuery] string token)
-    {
-        var safeEmail = System.Net.WebUtility.HtmlEncode(email);
-        var safeToken = System.Net.WebUtility.HtmlEncode(token);
-
-        return Content($"""
-            <!doctype html>
-            <html><body>
-            <h2>Reset password</h2>
-            <form method="post" action="/api/Auth/reset-password-page">
-                <input type="hidden" name="email" value="{safeEmail}" />
-                <input type="hidden" name="token" value="{safeToken}" />
-                <label>New password</label>
-                <input type="password" name="newPassword" required minlength="8" />
-                <button type="submit">Reset password</button>
-            </form>
-            </body></html>
-            """, "text/html");
-    }
-
-    [HttpPost("reset-password-page")]
-    [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
-    public async Task<IActionResult> ResetPasswordPage(
-        [FromForm] string email,
-        [FromForm] string token,
-        [FromForm] string newPassword)
-    {
-        await _sender.Send(new ResetPasswordCommand(email, token, newPassword));
-        return Content("<html><body><h2>Password reset successfully.</h2><p>You can now close this page and log in.</p></body></html>", "text/html");
-    }
-
     [HttpPost("verify-email")]
+    [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
     public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailCommand command)
     {
         await _sender.Send(command);
         return Ok(new { Message = "Email verified successfully." });
-    }
-
-    [HttpGet("verify-email")]
-    public async Task<IActionResult> VerifyEmailFromLink([FromQuery] string token)
-    {
-        await _sender.Send(new VerifyEmailCommand(token));
-
-        return Content(
-            "<html><body><h2>Email verified successfully.</h2><p>You can now close this page and log in.</p></body></html>",
-            "text/html");
     }
 }

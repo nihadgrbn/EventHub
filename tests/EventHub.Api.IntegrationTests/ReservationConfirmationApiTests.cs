@@ -19,6 +19,7 @@ public sealed class ReservationConfirmationApiTests(ApiTestFixture fixture)
     public async Task ConfirmReservation_QueuesReceiptAndSendsQrAttachments()
     {
         using var client = fixture.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", $"198.51.100.{Random.Shared.Next(1, 250)}");
         var email = $"reservation-{Guid.NewGuid():N}@example.com";
         const string password = "Password1!";
 
@@ -33,10 +34,10 @@ public sealed class ReservationConfirmationApiTests(ApiTestFixture fixture)
         Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
 
         var verificationEmail = Assert.Single(
-            fixture.EmailService.Messages.Where(message => message.To == email));
+            fixture.EmailService.Messages, message => message.To == email);
         var token = ExtractToken(verificationEmail.Body);
-        var verifyResponse = await client.GetAsync(
-            $"/api/Auth/verify-email?token={Uri.EscapeDataString(token)}");
+        var verifyResponse = await client.PostAsJsonAsync(
+            "/api/Auth/verify-email", new { token });
         Assert.Equal(HttpStatusCode.OK, verifyResponse.StatusCode);
 
         var loginResponse = await client.PostAsJsonAsync("/api/Auth/login", new { email, password });

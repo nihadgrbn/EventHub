@@ -13,14 +13,13 @@ public sealed class RegisterCommandHandlerTests
 {
     private readonly Mock<IUserRepository> _users = new();
     private readonly Mock<IPasswordHasher> _hasher = new();
-    private readonly Mock<IJwtProvider> _jwt = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<ISecureTokenService> _tokens = new();
     private readonly Mock<IEmailService> _emailService = new();
     private readonly Mock<IEmailVerificationLinkBuilder> _linkBuilder = new();
 
     private RegisterCommandHandler CreateHandler() =>
-        new(_users.Object, _hasher.Object, _jwt.Object, _unitOfWork.Object, _tokens.Object, _emailService.Object, _linkBuilder.Object);
+        new(_users.Object, _hasher.Object, _unitOfWork.Object, _tokens.Object, _emailService.Object, _linkBuilder.Object);
 
     [Fact]
     public async Task Handle_EmailAlreadyExists_ThrowsConflictException()
@@ -35,7 +34,7 @@ public sealed class RegisterCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_UniqueEmail_CreatesUserHashesPasswordGeneratesTokensAndSendsVerificationEmail()
+    public async Task Handle_UniqueEmail_CreatesUserHashesPasswordAndSendsVerificationEmail()
     {
         _users.Setup(u => u.IsEmailUniqueAsync("new@example.com", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
@@ -44,10 +43,6 @@ public sealed class RegisterCommandHandlerTests
         _tokens.Setup(t => t.GenerateToken()).Returns("verification-raw-token");
         _tokens.Setup(t => t.HashToken("verification-raw-token")).Returns("verification-hash");
         _tokens.Setup(t => t.GetEmailVerificationTokenExpiry()).Returns(DateTime.UtcNow.AddHours(24));
-        _jwt.Setup(j => j.Generate(It.IsAny<User>())).Returns("jwt-access-token");
-        _jwt.Setup(j => j.GenerateRefreshToken()).Returns("refresh-token");
-        _jwt.Setup(j => j.HashRefreshToken("refresh-token")).Returns("hashed-refresh-token");
-        _jwt.Setup(j => j.GetRefreshTokenExpiryTime()).Returns(DateTime.UtcNow.AddDays(7));
         _linkBuilder.Setup(l => l.Build("verification-raw-token")).Returns("http://localhost:8080/api/Auth/verify-email?token=verification-raw-token");
 
         User? capturedUser = null;
@@ -57,12 +52,7 @@ public sealed class RegisterCommandHandlerTests
 
         var handler = CreateHandler();
         var command = new RegisterCommand("Alice", "Smith", "new@example.com", "Password123!", "Organizer");
-        var response = await handler.Handle(command, CancellationToken.None);
-
-        Assert.NotNull(response);
-        Assert.Equal("jwt-access-token", response.Token);
-        Assert.Equal("refresh-token", response.RefreshToken);
-        Assert.Equal("Organizer", response.Role);
+        await handler.Handle(command, CancellationToken.None);
 
         Assert.NotNull(capturedUser);
         Assert.Equal("Alice", capturedUser.FirstName);
