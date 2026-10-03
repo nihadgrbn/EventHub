@@ -12,6 +12,11 @@ public sealed record AdminUserDto(
 public sealed record AdminEventDto(
     Guid Id,
     string Title,
+    string Description,
+    string Location,
+    string Address,
+    string? PosterImageUrl,
+    string? RejectionReason,
     string Status,
     string Category,
     DateTime Date,

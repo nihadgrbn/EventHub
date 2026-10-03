@@ -22,6 +22,7 @@ namespace EventHub.Infrastructure.Persistence.Configurations
                 .IsRequired();
             builder.Property(e => e.Address).HasMaxLength(300).IsRequired();
             builder.Property(e => e.PosterImageUrl).HasMaxLength(2048);
+            builder.Property(e => e.RejectionReason).HasMaxLength(1000);
             builder.Property(e => e.Latitude).HasColumnType("decimal(9,6)");
             builder.Property(e => e.Longitude).HasColumnType("decimal(9,6)");
             builder.Property(e => e.Status)

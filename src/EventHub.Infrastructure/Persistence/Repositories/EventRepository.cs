@@ -7,13 +7,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EventHub.Infrastructure.Persistence.Repositories
 {
-    public class EventRepository: IEventRepository
+    public class EventRepository : IEventRepository
     {
         private readonly ApplicationDbContext _context;
         public EventRepository(ApplicationDbContext context)
         {
             _context = context;
-            
+
         }
         public async Task AddAsync(Event @event, CancellationToken cancellationToken)
         {
@@ -82,6 +82,25 @@ namespace EventHub.Infrastructure.Persistence.Repositories
             return new OrganizerStatisticsDto(totalEvents, totalTicketsSold, totalRevenue, upcomingEvents);
         }
 
+        public async Task<(IEnumerable<Event> Events, int TotalCount)> GetOrganizerEventsAsync(Guid organizerId, int pageNumber, int pageSize, CancellationToken cancellationToken)
+        {
+            var query = _context.Events
+                .Include(e => e.Organizer)
+                .Include(e => e.TicketTypes)
+                .Where(e => e.OrganizerId == organizerId)
+                .OrderByDescending(e => e.CreatedAt)
+                .AsNoTracking();
+
+            var totalCount = await query.CountAsync(cancellationToken);
+
+            var events = await query
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+            return (events, totalCount);
+        }
+
         public async Task<(IEnumerable<Event> Events, int TotalCount)> GetPagedEventsAsync(
     string? searchTerm,
     string? location,
@@ -129,7 +148,7 @@ namespace EventHub.Infrastructure.Persistence.Repositories
             {
                 "title" => sortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.Title) : query.OrderBy(e => e.Title),
                 "date" => sortOrder?.ToLower() == "desc" ? query.OrderByDescending(e => e.Date) : query.OrderBy(e => e.Date),
-                _ => query.OrderBy(e => e.Date) 
+                _ => query.OrderBy(e => e.Date)
             };
 
             var totalCount = await query.CountAsync(cancellationToken);

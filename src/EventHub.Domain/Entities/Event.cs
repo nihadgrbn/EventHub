@@ -17,6 +17,9 @@
             public decimal? Latitude { get; set; }
             public decimal? Longitude { get; set; }
             public Enums.EventStatus Status { get; set; } = Enums.EventStatus.Draft;
+            public string? RejectionReason { get; set; }
+
+
 
             public Guid OrganizerId {  get; set; }
             public User? Organizer { get; set; }

@@ -1,11 +1,11 @@
-﻿using EventHub.Application.Authentication.Command.Register;
-using EventHub.Api.Constants;
+﻿using EventHub.Api.Constants;
+using EventHub.Application.Authentication.Command.Register;
+using EventHub.Application.Authentication.Commands.ForgotPassword;
 using EventHub.Application.Authentication.Commands.Logout;
 using EventHub.Application.Authentication.Commands.Refresh;
-using EventHub.Application.Authentication.Queries.Login;
-using EventHub.Application.Authentication.Commands.ForgotPassword;
 using EventHub.Application.Authentication.Commands.ResetPassword;
 using EventHub.Application.Authentication.Commands.VerifyEmail;
+using EventHub.Application.Authentication.Queries.Login;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;

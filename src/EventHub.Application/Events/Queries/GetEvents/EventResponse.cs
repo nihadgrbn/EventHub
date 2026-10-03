@@ -17,8 +17,9 @@ namespace EventHub.Application.Events.Queries.GetEvents
         decimal? Latitude,
         decimal? Longitude,
         EventHub.Domain.Enums.EventStatus Status,
+        string? RejectionReason,
         Guid OrganizerId,
         string OrganizerName,
         IEnumerable<TicketTypeResponseDto> TicketTypes);
-    
+
 }

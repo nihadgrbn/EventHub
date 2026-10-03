@@ -83,6 +83,11 @@ public sealed class AdminReadRepository : IAdminReadRepository
             .Select(@event => new AdminEventDto(
                 @event.Id,
                 @event.Title,
+                @event.Description,
+                @event.Location,
+                @event.Address,
+                @event.PosterImageUrl,
+                @event.RejectionReason,
                 @event.Status.ToString(),
                 @event.Category.ToString(),
                 @event.Date,

@@ -1,7 +1,6 @@
-using FluentValidation;
 using EventHub.Application.Common.Exceptions;
+using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EventHub.Api.Middleware;

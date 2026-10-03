@@ -1,32 +1,33 @@
-﻿using EventHub.Application.Common.Interfaces;
+﻿using EventHub.Application.Common.Exceptions;
+using EventHub.Application.Common.Interfaces;
 using EventHub.Application.Common.Models;
+using EventHub.Application.Events.Queries.GetEvents;
 using MediatR;
-using System.Collections.Generic;
+using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace EventHub.Application.Events.Queries.GetEvents
+namespace EventHub.Application.Events.Queries.GetOrganizerEvents
 {
-    public class GetEventsQueryHandler : IRequestHandler<GetEventsQuery, PaginatedList<EventResponse>>
+    public class GetOrganizerEventsQueryHandler : IRequestHandler<GetOrganizerEventsQuery, PaginatedList<EventResponse>>
     {
         private readonly IEventRepository _eventRepository;
+        private readonly ICurrentUserService _currentUserService;
 
-        public GetEventsQueryHandler(IEventRepository eventRepository)
+        public GetOrganizerEventsQueryHandler(IEventRepository eventRepository, ICurrentUserService currentUserService)
         {
             _eventRepository = eventRepository;
+            _currentUserService = currentUserService;
         }
 
-        public async Task<PaginatedList<EventResponse>> Handle(GetEventsQuery request, CancellationToken cancellationToken)
+        public async Task<PaginatedList<EventResponse>> Handle(GetOrganizerEventsQuery request, CancellationToken cancellationToken)
         {
-            var (events, totalCount) = await _eventRepository.GetPagedEventsAsync(
-                request.SearchTerm,
-                request.Location,
-                request.Category,
-                request.DateFrom,
-                request.DateTo,
-                request.SortBy,
-                request.SortOrder,
+            var userId = _currentUserService.UserId
+                ?? throw new UnauthorizedException("A valid user is required to view organizer events.");
+
+            var (events, totalCount) = await _eventRepository.GetOrganizerEventsAsync(
+                userId,
                 request.PageNumber,
                 request.PageSize,
                 cancellationToken);

@@ -45,6 +45,7 @@ namespace EventHub.Application.Events.Queries.GetEventById
                 @event.Latitude,
                 @event.Longitude,
                 @event.Status,
+                @event.RejectionReason,
                 @event.OrganizerId,
                 @event.Organizer is null
                     ? string.Empty

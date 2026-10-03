@@ -3,4 +3,4 @@ using MediatR;
 
 namespace EventHub.Application.Events.Commands.UpdateEventStatus;
 
-public record UpdateEventStatusCommand(Guid Id, EventStatus Status) : IRequest;
+public record UpdateEventStatusCommand(Guid Id, EventStatus Status, string? RejectionReason = null) : IRequest;

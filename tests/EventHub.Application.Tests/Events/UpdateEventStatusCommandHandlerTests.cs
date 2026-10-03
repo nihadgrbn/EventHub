@@ -1,6 +1,7 @@
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Application.Events.Commands.UpdateEventStatus;
+using EventHub.Domain.Constants;
 using EventHub.Domain.Entities;
 using EventHub.Domain.Enums;
 using Moq;
@@ -13,14 +14,21 @@ public sealed class UpdateEventStatusCommandHandlerTests
     private readonly Mock<IEventRepository> _events = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly Mock<ICurrentUserService> _currentUser = new();
+    private readonly Mock<IEmailService> _emailService = new();
 
     [Fact]
-    public async Task Handle_DraftEventWithFutureDate_PublishesEvent()
+    public async Task Handle_PendingReviewEventWithFutureDate_AdminPublishesEvent()
     {
         var organizerId = Guid.NewGuid();
-        var @event = new Event { OrganizerId = organizerId, Date = DateTime.UtcNow.AddDays(1), Status = EventStatus.Draft };
+        var @event = new Event
+        {
+            OrganizerId = organizerId,
+            Date = DateTime.UtcNow.AddDays(1),
+            Status = EventStatus.PendingReview
+        };
         _events.Setup(repository => repository.GetByIdAsync(@event.Id, It.IsAny<CancellationToken>())).ReturnsAsync(@event);
-        _currentUser.SetupGet(service => service.UserId).Returns(organizerId);
+        _currentUser.SetupGet(service => service.UserId).Returns(Guid.NewGuid());
+        _currentUser.Setup(service => service.IsInRole(Roles.Admin)).Returns(true);
 
         await CreateHandler().Handle(new UpdateEventStatusCommand(@event.Id, EventStatus.Published), CancellationToken.None);
 
@@ -32,13 +40,23 @@ public sealed class UpdateEventStatusCommandHandlerTests
     public async Task Handle_DraftEventWithPastDate_CannotPublish()
     {
         var organizerId = Guid.NewGuid();
-        var @event = new Event { OrganizerId = organizerId, Date = DateTime.UtcNow.AddMinutes(-1), Status = EventStatus.Draft };
+        var @event = new Event
+        {
+            OrganizerId = organizerId,
+            Date = DateTime.UtcNow.AddMinutes(-1),
+            Status = EventStatus.PendingReview
+        };
         _events.Setup(repository => repository.GetByIdAsync(@event.Id, It.IsAny<CancellationToken>())).ReturnsAsync(@event);
-        _currentUser.SetupGet(service => service.UserId).Returns(organizerId);
+        _currentUser.SetupGet(service => service.UserId).Returns(Guid.NewGuid());
+        _currentUser.Setup(service => service.IsInRole(Roles.Admin)).Returns(true);
 
         await Assert.ThrowsAsync<ConflictException>(() =>
             CreateHandler().Handle(new UpdateEventStatusCommand(@event.Id, EventStatus.Published), CancellationToken.None));
     }
 
-    private UpdateEventStatusCommandHandler CreateHandler() => new(_events.Object, _unitOfWork.Object, _currentUser.Object);
+    private UpdateEventStatusCommandHandler CreateHandler() => new(
+        _events.Object,
+        _unitOfWork.Object,
+        _currentUser.Object,
+        _emailService.Object);
 }

@@ -11,24 +11,25 @@ namespace EventHub.Application.Common.Interfaces
     {
         Task AddAsync(Event @event, CancellationToken cancellationToken);
         Task<IEnumerable<Event>> GetAllAsync(CancellationToken cancellationToken);
-        Task<Event?> GetByIdAsync(Guid id,CancellationToken cancellationToken);
+        Task<Event?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
         void Update(Event @event);
         void Delete(Event @event);
         Task<int> CompleteExpiredPublishedEventsAsync(
             DateTime utcNow,
             CancellationToken cancellationToken);
         Task<(IEnumerable<Event> Events, int TotalCount)> GetPagedEventsAsync(
-            string? searchTerm, 
-            string? location, 
+            string? searchTerm,
+            string? location,
             EventCategory? category,
             DateTime? dateFrom,
             DateTime? dateTo,
-            string? sortBy, 
+            string? sortBy,
             string? sortOrder,
-            int pageNumber, 
-            int pageSize, 
+            int pageNumber,
+            int pageSize,
             CancellationToken cancellationToken);
         Task<OrganizerStatisticsDto> GetOrganizerStatisticsAsync(Guid? organizerId, CancellationToken cancellationToken);
+        Task<(IEnumerable<Event> Events, int TotalCount)> GetOrganizerEventsAsync(Guid organizerId, int pageNumber, int pageSize, CancellationToken cancellationToken);
 
     }
 }

@@ -9,6 +9,7 @@ using EventHub.Application.Events.Commands.UploadPoster;
 using EventHub.Domain.Enums;
 using EventHub.Application.Events.Queries.GetEventById;
 using EventHub.Application.Events.Queries.GetEvents;
+using EventHub.Application.Events.Queries.GetOrganizerEvents;
 using EventHub.Domain.Constants;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -36,12 +37,20 @@ namespace EventHub.Api.Controllers
             return Ok(result);
         }
 
+        [HttpGet("my-events")]
+        [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        public async Task<IActionResult> GetMyEvents([FromQuery] GetOrganizerEventsQuery query, CancellationToken cancellationToken)
+        {
+            var result = await _sender.Send(query, cancellationToken);
+            return Ok(result);
+        }
+
         [HttpPost]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
         public async Task<IActionResult> CreateEvent([FromBody] CreateEventCommand command, CancellationToken cancellationToken)
         {
             var eventId = await _sender.Send(command, cancellationToken);
-                return CreatedAtAction(nameof(GetEventById), new { id = eventId }, eventId); 
+            return CreatedAtAction(nameof(GetEventById), new { id = eventId }, eventId);
         }
 
         [HttpGet("{id}")]
@@ -65,7 +74,7 @@ namespace EventHub.Api.Controllers
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
         public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateEventStatusRequest request, CancellationToken cancellationToken)
         {
-            await _sender.Send(new UpdateEventStatusCommand(id, request.Status), cancellationToken);
+            await _sender.Send(new UpdateEventStatusCommand(id, request.Status, request.RejectionReason), cancellationToken);
             return NoContent();
         }
 
@@ -118,5 +127,5 @@ namespace EventHub.Api.Controllers
         }
     }
 
-    public record UpdateEventStatusRequest(EventStatus Status);
+    public record UpdateEventStatusRequest(EventStatus Status, string? RejectionReason);
 }
