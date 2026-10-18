@@ -22,6 +22,7 @@ public sealed class ReservationExpirationServiceTests
             ReservedUntil = DateTime.UtcNow.AddMinutes(-1)
         };
         var reservations = new Mock<IReservationRepository>();
+        var payments = new Mock<IPaymentRepository>();
         var ticketTypes = new Mock<ITicketTypeRepository>();
         var unitOfWork = new Mock<IUnitOfWork>();
         reservations.Setup(repository => repository.GetExpiredActiveAsync(
@@ -30,12 +31,16 @@ public sealed class ReservationExpirationServiceTests
         ticketTypes.Setup(repository => repository.TryIncreaseAvailableQuantityAsync(
                 reservation.TicketTypeId, reservation.Quantity, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
+        payments.Setup(repository => repository.TryMarkAsExpiredAsync(
+                reservation.PaymentId, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         unitOfWork.Setup(unit => unit.ExecuteInTransactionAsync(
                 It.IsAny<Func<CancellationToken, Task>>(), It.IsAny<CancellationToken>()))
             .Returns<Func<CancellationToken, Task>, CancellationToken>((action, token) => action(token));
 
         var service = new ReservationExpirationService(
             reservations.Object,
+            payments.Object,
             ticketTypes.Object,
             unitOfWork.Object,
             NullLogger<ReservationExpirationService>.Instance);
@@ -64,6 +69,7 @@ public sealed class ReservationExpirationServiceTests
             Status = ReservationStatus.Active
         };
         var reservations = new Mock<IReservationRepository>();
+        var payments = new Mock<IPaymentRepository>();
         var ticketTypes = new Mock<ITicketTypeRepository>();
         var unitOfWork = new Mock<IUnitOfWork>();
         reservations.Setup(repository => repository.GetExpiredActiveAsync(
@@ -78,6 +84,7 @@ public sealed class ReservationExpirationServiceTests
 
         var service = new ReservationExpirationService(
             reservations.Object,
+            payments.Object,
             ticketTypes.Object,
             unitOfWork.Object,
             NullLogger<ReservationExpirationService>.Instance);

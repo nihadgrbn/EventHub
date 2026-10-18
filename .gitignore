@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Local Docker secrets
 .env
+
+# Runtime-uploaded media
+src/EventHub.Api/wwwroot/uploads/

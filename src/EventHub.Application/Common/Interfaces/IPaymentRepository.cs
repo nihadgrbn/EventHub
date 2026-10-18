@@ -15,4 +15,40 @@ public interface IPaymentRepository
         Guid paymentId,
         DateTime paidAt,
         CancellationToken cancellationToken);
+
+    Task<bool> TryMarkAsExpiredAsync(
+        Guid paymentId,
+        DateTime expiredAt,
+        CancellationToken cancellationToken);
+
+    Task<bool> TryMarkAsFailedAsync(
+        Guid paymentId,
+        DateTime failedAt,
+        CancellationToken cancellationToken);
+
+    Task<bool> TryMarkAsExpiredByCheckoutSessionIdAsync(
+        string checkoutSessionId,
+        DateTime expiredAt,
+        CancellationToken cancellationToken);
+
+    Task<bool> TryMarkAsFailedByPaymentIntentIdAsync(
+        string paymentIntentId,
+        DateTime failedAt,
+        CancellationToken cancellationToken);
+
+    Task<bool> TryMarkAsRefundedByPaymentIntentIdAsync(
+        string paymentIntentId,
+        DateTime refundedAt,
+        CancellationToken cancellationToken);
+
+    Task SetCheckoutSessionAsync(
+        Guid paymentId,
+        string checkoutSessionId,
+        string checkoutUrl,
+        CancellationToken cancellationToken);
+
+    Task SetPaymentIntentIdAsync(
+        Guid paymentId,
+        string paymentIntentId,
+        CancellationToken cancellationToken);
 }

@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Infrastructure.Persistence;
+using EventHub.Infrastructure.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -49,6 +51,9 @@ public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifet
 
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<IPaymentGateway>();
+            services.AddScoped<IPaymentGateway, DevelopmentPaymentGateway>();
+
             var emailService = services.Single(descriptor => descriptor.ServiceType == typeof(IEmailService));
             services.Remove(emailService);
             services.AddSingleton<IEmailService>(EmailService);

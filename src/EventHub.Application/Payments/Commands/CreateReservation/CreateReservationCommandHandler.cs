@@ -9,7 +9,7 @@ namespace EventHub.Application.Payments.Commands.CreateReservation;
 public sealed class CreateReservationCommandHandler
     : IRequestHandler<CreateReservationCommand, CreateReservationResult>
 {
-    private static readonly TimeSpan ReservationDuration = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan ReservationDuration = TimeSpan.FromMinutes(31);
 
     private readonly ITicketTypeRepository _ticketTypes;
     private readonly IEventRepository _events;
@@ -17,6 +17,7 @@ public sealed class CreateReservationCommandHandler
     private readonly IPaymentRepository _payments;
     private readonly IReservationRepository _reservations;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IPaymentGateway _paymentGateway;
 
     public CreateReservationCommandHandler(
         ITicketTypeRepository ticketTypes,
@@ -24,7 +25,8 @@ public sealed class CreateReservationCommandHandler
         ICurrentUserService currentUser,
         IPaymentRepository payments,
         IReservationRepository reservations,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IPaymentGateway paymentGateway)
     {
         _ticketTypes = ticketTypes;
         _events = events;
@@ -32,6 +34,7 @@ public sealed class CreateReservationCommandHandler
         _payments = payments;
         _reservations = reservations;
         _unitOfWork = unitOfWork;
+        _paymentGateway = paymentGateway;
     }
 
     public async Task<CreateReservationResult> Handle(
@@ -66,12 +69,20 @@ public sealed class CreateReservationCommandHandler
                         "The idempotency key was already used for a different reservation request.");
                 }
 
+                var expectedAmount = existingReservation.UnitPrice * request.Quantity;
+                if (existingPayment.Amount != expectedAmount)
+                {
+                    throw new ConflictException(
+                        "The idempotency key was already used with different reservation details.");
+                }
+
                 return new CreateReservationResult(
                     existingPayment.Id,
                     existingReservation.Id,
                     existingPayment.Amount,
                     existingPayment.Currency,
-                    existingPayment.ExpiresAt);
+                    existingPayment.ExpiresAt,
+                    existingPayment.StripeCheckoutUrl);
             }
         }
 
@@ -128,11 +139,77 @@ public sealed class CreateReservationCommandHandler
             await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
         }, cancellationToken);
 
+        PaymentCheckoutSession checkoutSession;
+        try
+        {
+            checkoutSession = await _paymentGateway.CreateCheckoutSessionAsync(
+                new PaymentCheckoutRequest(
+                    payment.Id,
+                    reservation.Id,
+                    payment.Amount,
+                    payment.Currency,
+                    payment.ExpiresAt),
+                cancellationToken);
+
+            await _payments.SetCheckoutSessionAsync(
+                payment.Id,
+                checkoutSession.SessionId,
+                checkoutSession.CheckoutUrl,
+                cancellationToken);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            await CompensateFailedCheckoutAsync(payment.Id, reservation, cancellationToken);
+            throw;
+        }
+
         return new CreateReservationResult(
             payment.Id,
             reservation.Id,
             payment.Amount,
             payment.Currency,
-            payment.ExpiresAt);
+            payment.ExpiresAt,
+            checkoutSession.CheckoutUrl);
+    }
+
+    private async Task CompensateFailedCheckoutAsync(
+        Guid paymentId,
+        Reservation reservation,
+        CancellationToken cancellationToken)
+    {
+        var failedAt = DateTime.UtcNow;
+
+        await _unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
+        {
+            if (!await _payments.TryMarkAsFailedAsync(
+                    paymentId,
+                    failedAt,
+                    transactionCancellationToken))
+            {
+                return;
+            }
+
+            if (!await _ticketTypes.TryIncreaseAvailableQuantityAsync(
+                    reservation.TicketTypeId,
+                    reservation.Quantity,
+                    transactionCancellationToken))
+            {
+                throw new InvalidOperationException(
+                    $"Unable to restore inventory for reservation {reservation.Id}.");
+            }
+
+            await _reservations.UpdateStatusAsync(
+                reservation.Id,
+                ReservationStatus.Cancelled,
+                failedAt,
+                transactionCancellationToken);
+            await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
+        }, cancellationToken);
     }
 }

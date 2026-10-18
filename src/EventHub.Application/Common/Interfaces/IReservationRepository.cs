@@ -12,6 +12,10 @@ public interface IReservationRepository
         Guid attendeeId,
         CancellationToken cancellationToken);
 
+    Task<Reservation?> GetForWebhookConfirmationAsync(
+        Guid reservationId,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<Reservation>> GetExpiredActiveAsync(
         DateTime utcNow,
         CancellationToken cancellationToken);

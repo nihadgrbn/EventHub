@@ -20,6 +20,7 @@ public sealed class ConfirmReservationCommandHandler
     private readonly IUserRepository _users;
     private readonly IOutboxRepository _outbox;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IStripeEventRepository _stripeEvents;
 
     public ConfirmReservationCommandHandler(
         ICurrentUserService currentUser,
@@ -29,7 +30,8 @@ public sealed class ConfirmReservationCommandHandler
         ITicketRepository tickets,
         IUserRepository users,
         IOutboxRepository outbox,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IStripeEventRepository stripeEvents)
     {
         _currentUser = currentUser;
         _reservations = reservations;
@@ -39,23 +41,68 @@ public sealed class ConfirmReservationCommandHandler
         _users = users;
         _outbox = outbox;
         _unitOfWork = unitOfWork;
+        _stripeEvents = stripeEvents;
     }
 
     public async Task<ConfirmReservationResult> Handle(
         ConfirmReservationCommand request,
         CancellationToken cancellationToken)
     {
-        var attendeeId = _currentUser.UserId
-            ?? throw new UnauthorizedException("You must be logged in to confirm a reservation.");
-        var reservation = await _reservations.GetForConfirmationAsync(
-            request.ReservationId,
-            attendeeId,
-            cancellationToken)
-            ?? throw new NotFoundException("Reservation not found.");
+        Guid attendeeId;
+        Reservation? reservation;
+
+        if (request.StripeCheckoutSessionId is not null)
+        {
+            reservation = await _reservations.GetForWebhookConfirmationAsync(
+                request.ReservationId,
+                cancellationToken);
+            attendeeId = reservation?.AttendeeId
+                ?? throw new NotFoundException("Reservation not found.");
+        }
+        else
+        {
+            attendeeId = _currentUser.UserId
+                ?? throw new UnauthorizedException("You must be logged in to confirm a reservation.");
+            reservation = await _reservations.GetForConfirmationAsync(
+                request.ReservationId,
+                attendeeId,
+                cancellationToken)
+                ?? throw new NotFoundException("Reservation not found.");
+        }
 
         if (reservation.Payment is null || reservation.Event is null || reservation.TicketType is null)
         {
             throw new ConflictException("Reservation data is incomplete.");
+        }
+
+        if (request.StripeCheckoutSessionId is not null
+            && !string.Equals(
+                reservation.Payment.StripeCheckoutSessionId,
+                request.StripeCheckoutSessionId,
+                StringComparison.Ordinal))
+        {
+            throw new ConflictException("The Stripe checkout session does not match the reservation.");
+        }
+
+        if (request.StripePaymentId is not null
+            && reservation.PaymentId != request.StripePaymentId)
+        {
+            throw new ConflictException("The Stripe payment does not match the reservation.");
+        }
+
+        if (request.StripeAmountTotal is not null
+            && request.StripeAmountTotal != ToMinorUnits(reservation.Payment.Amount))
+        {
+            throw new ConflictException("The Stripe payment amount does not match the reservation.");
+        }
+
+        if (request.StripeCurrency is not null
+            && !string.Equals(
+                reservation.Payment.Currency,
+                request.StripeCurrency,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ConflictException("The Stripe payment currency does not match the reservation.");
         }
 
         var attendee = await _users.GetByIdAsync(attendeeId, cancellationToken)
@@ -114,6 +161,22 @@ public sealed class ConfirmReservationCommandHandler
 
         await _unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
         {
+            if (request.StripeEventId is not null
+                && !await _stripeEvents.TryMarkAsProcessedAsync(
+                    request.StripeEventId,
+                    transactionCancellationToken))
+            {
+                throw new ConflictException("The Stripe event has already been processed.");
+            }
+
+            if (request.StripePaymentIntentId is not null)
+            {
+                await _payments.SetPaymentIntentIdAsync(
+                    reservation.PaymentId,
+                    request.StripePaymentIntentId,
+                    transactionCancellationToken);
+            }
+
             if (!await _payments.TryMarkAsPaidAsync(
                     reservation.PaymentId,
                     confirmedAt,
@@ -142,4 +205,7 @@ public sealed class ConfirmReservationCommandHandler
             purchase.Id,
             tickets.Select(ticket => ticket.Id).ToList());
     }
+
+    private static long ToMinorUnits(decimal amount) =>
+        checked((long)Math.Round(amount * 100m, MidpointRounding.AwayFromZero));
 }

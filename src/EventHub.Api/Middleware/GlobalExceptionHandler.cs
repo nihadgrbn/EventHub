@@ -23,7 +23,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
-        if (exception is ValidationException or ConflictException or UnauthorizedException or ForbiddenException or NotFoundException)
+        if (exception is ValidationException or ConflictException or UnauthorizedException or ForbiddenException or NotFoundException or PaymentProviderException)
         {
             _logger.LogWarning(
                 "Request failed with {ExceptionType} for {Path}.",
@@ -56,6 +56,8 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 (StatusCodes.Status401Unauthorized, unauthorizedException.Message, null),
             ForbiddenException forbiddenException =>
                 (StatusCodes.Status403Forbidden, forbiddenException.Message, null),
+            PaymentProviderException paymentProviderException =>
+                (StatusCodes.Status502BadGateway, paymentProviderException.Message, null),
             _ =>
                 (StatusCodes.Status500InternalServerError, "An unexpected error occurred.", null)
         };

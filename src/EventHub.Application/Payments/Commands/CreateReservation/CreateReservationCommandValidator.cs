@@ -17,9 +17,10 @@ public sealed class CreateReservationCommandValidator : AbstractValidator<Create
             .WithMessage("Quantity must be between 1 and 10.");
 
         RuleFor(command => command.IdempotencyKey)
-            .Must(value => value is null || value == value.Trim())
+            .NotEmpty()
+            .WithMessage("Idempotency key is required.")
+            .Must(value => value == value.Trim())
             .WithMessage("Idempotency key cannot start or end with whitespace.")
-            .MaximumLength(100)
-            .When(command => command.IdempotencyKey is not null);
+            .MaximumLength(100);
     }
 }

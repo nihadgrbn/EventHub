@@ -192,6 +192,10 @@ namespace EventHub.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<string>("StripeCheckoutUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<string>("StripePaymentIntentId")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
@@ -214,6 +218,31 @@ namespace EventHub.Infrastructure.Migrations
                         .HasFilter("\"IdempotencyKey\" IS NOT NULL");
 
                     b.ToTable("Payments");
+                });
+
+            modelBuilder.Entity("EventHub.Domain.Entities.ProcessedStripeEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventId")
+                        .IsUnique();
+
+                    b.ToTable("ProcessedStripeEvents");
                 });
 
             modelBuilder.Entity("EventHub.Domain.Entities.Purchase", b =>

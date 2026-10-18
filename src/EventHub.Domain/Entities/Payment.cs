@@ -13,6 +13,7 @@ public sealed class Payment : BaseEntity
     public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
 
     public string? StripeCheckoutSessionId { get; set; }
+    public string? StripeCheckoutUrl { get; set; }
     public string? StripePaymentIntentId { get; set; }
     public string? IdempotencyKey { get; set; }
 

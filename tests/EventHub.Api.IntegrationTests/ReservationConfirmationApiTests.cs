@@ -50,13 +50,36 @@ public sealed class ReservationConfirmationApiTests(ApiTestFixture fixture)
         var ticketTypeId = Guid.NewGuid();
         await SeedEventAsync(fixture, eventId, ticketTypeId, loginJson.RootElement.GetProperty("data").GetProperty("id").GetGuid());
 
+        var idempotencyKey = $"integration-{Guid.NewGuid():N}";
         var reservationResponse = await client.PostAsJsonAsync(
             "/api/Payments/reservations",
             new { eventId, ticketTypeId, quantity = 2 },
-            new HttpRequestMessageOptions { Headers = { { "Idempotency-Key", $"integration-{Guid.NewGuid():N}" } } });
+            new HttpRequestMessageOptions { Headers = { { "Idempotency-Key", idempotencyKey } } });
         reservationResponse.EnsureSuccessStatusCode();
         using var reservationJson = JsonDocument.Parse(await reservationResponse.Content.ReadAsStringAsync());
         var reservationId = reservationJson.RootElement.GetProperty("reservationId").GetGuid();
+
+        var retryResponse = await client.PostAsJsonAsync(
+            "/api/Payments/reservations",
+            new { eventId, ticketTypeId, quantity = 2 },
+            new HttpRequestMessageOptions { Headers = { { "Idempotency-Key", idempotencyKey } } });
+        retryResponse.EnsureSuccessStatusCode();
+        using var retryJson = JsonDocument.Parse(await retryResponse.Content.ReadAsStringAsync());
+        Assert.Equal(
+            reservationId,
+            retryJson.RootElement.GetProperty("reservationId").GetGuid());
+
+        var pendingStatusResponse = await client.GetAsync(
+            $"/api/Payments/reservations/{reservationId}");
+        pendingStatusResponse.EnsureSuccessStatusCode();
+        using var pendingStatusJson = JsonDocument.Parse(
+            await pendingStatusResponse.Content.ReadAsStringAsync());
+        Assert.Equal(
+            "Pending",
+            pendingStatusJson.RootElement.GetProperty("paymentStatus").GetString());
+        Assert.Equal(
+            "Active",
+            pendingStatusJson.RootElement.GetProperty("reservationStatus").GetString());
 
         var confirmResponse = await client.PostAsync(
             $"/api/Payments/reservations/{reservationId}/confirm", null);
@@ -66,6 +89,18 @@ public sealed class ReservationConfirmationApiTests(ApiTestFixture fixture)
             .EnumerateArray()
             .Select(element => element.GetGuid())
             .ToArray();
+
+        var confirmedStatusResponse = await client.GetAsync(
+            $"/api/Payments/reservations/{reservationId}");
+        confirmedStatusResponse.EnsureSuccessStatusCode();
+        using var confirmedStatusJson = JsonDocument.Parse(
+            await confirmedStatusResponse.Content.ReadAsStringAsync());
+        Assert.Equal(
+            "Paid",
+            confirmedStatusJson.RootElement.GetProperty("paymentStatus").GetString());
+        Assert.Equal(
+            "Confirmed",
+            confirmedStatusJson.RootElement.GetProperty("reservationStatus").GetString());
 
         var receiptEmail = await WaitForEmailAsync(fixture, email);
         Assert.Contains("purchase receipt", receiptEmail.Subject, StringComparison.OrdinalIgnoreCase);
@@ -84,6 +119,16 @@ public sealed class ReservationConfirmationApiTests(ApiTestFixture fixture)
             message.Type == "PurchaseReceiptEvent"
             && message.Payload == string.Empty);
         Assert.Equal("Sent", outbox.Status);
+    }
+
+    [Fact]
+    public async Task GetReservationStatus_RequiresAuthentication()
+    {
+        using var client = fixture.CreateClient();
+
+        var response = await client.GetAsync($"/api/Payments/reservations/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     private static async Task SeedEventAsync(

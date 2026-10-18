@@ -20,6 +20,7 @@ namespace EventHub.Infrastructure.Persistence
         public DbSet<Payment> Payments { get; set; }
         public DbSet<Reservation> Reservations { get; set; }
         public DbSet<OutboxMessage> OutboxMessages { get; set; }
+        public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -27,6 +27,19 @@ public sealed class ReservationRepository : IReservationRepository
                 && reservation.AttendeeId == attendeeId, cancellationToken);
     }
 
+    public async Task<Reservation?> GetForWebhookConfirmationAsync(
+        Guid reservationId,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Reservations
+            .Include(reservation => reservation.Payment)
+            .Include(reservation => reservation.Event)
+            .Include(reservation => reservation.TicketType)
+            .SingleOrDefaultAsync(
+                reservation => reservation.Id == reservationId,
+                cancellationToken);
+    }
+
     public async Task AddAsync(Reservation reservation, CancellationToken cancellationToken)
     {
         await _context.Reservations.AddAsync(reservation, cancellationToken);

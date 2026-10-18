@@ -16,6 +16,7 @@ public sealed class CreateReservationCommandHandlerTests
     private readonly Mock<IPaymentRepository> _payments = new();
     private readonly Mock<IReservationRepository> _reservations = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IPaymentGateway> _paymentGateway = new();
 
     [Fact]
     public async Task Handle_WhenStockIsAvailable_CreatesPaymentAndReservation()
@@ -97,7 +98,8 @@ public sealed class CreateReservationCommandHandlerTests
                         Id = reservationId,
                         EventId = eventId,
                         TicketTypeId = ticketTypeId,
-                        Quantity = 2
+                        Quantity = 2,
+                        UnitPrice = 25m
                     }
                 }
             });
@@ -145,12 +147,18 @@ public sealed class CreateReservationCommandHandlerTests
 
     private CreateReservationCommandHandler CreateHandler()
     {
+        _paymentGateway.Setup(gateway => gateway.CreateCheckoutSessionAsync(
+                It.IsAny<PaymentCheckoutRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PaymentCheckoutSession("cs_test", "https://checkout.test/session"));
+
         return new CreateReservationCommandHandler(
             _ticketTypes.Object,
             _events.Object,
             _currentUser.Object,
             _payments.Object,
             _reservations.Object,
-            _unitOfWork.Object);
+            _unitOfWork.Object,
+            _paymentGateway.Object);
     }
 }

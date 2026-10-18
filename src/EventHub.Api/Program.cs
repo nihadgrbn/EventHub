@@ -170,6 +170,8 @@ builder.Services.Configure<JwtOptions>(
     builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<TokenOptions>(
     builder.Configuration.GetSection("TokenOptions"));
+builder.Services.Configure<StripeOptions>(
+    builder.Configuration.GetSection(StripeOptions.SectionName));
 builder.Services.AddOptions<EmailOptions>()
     .Bind(builder.Configuration.GetSection(EmailOptions.SectionName))
     .Validate(options =>
@@ -216,9 +218,18 @@ builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<IAdminReadRepository, AdminReadRepository>();
 builder.Services.AddScoped<IReservationExpirationService, ReservationExpirationService>();
 builder.Services.AddScoped<IOutboxRepository, OutboxRepository>();
+builder.Services.AddScoped<IStripeEventRepository, StripeEventRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+if (builder.Configuration.GetValue<bool>("Stripe:Enabled"))
+{
+    builder.Services.AddScoped<IPaymentGateway, StripePaymentGateway>();
+}
+else
+{
+    builder.Services.AddScoped<IPaymentGateway, DevelopmentPaymentGateway>();
+}
 builder.Services.AddHostedService<OutboxProcessorBackgroundService>();
 builder.Services.AddHostedService<EventStatusBackgroundService>();
 builder.Services.AddHostedService<ReservationExpirationBackgroundService>();

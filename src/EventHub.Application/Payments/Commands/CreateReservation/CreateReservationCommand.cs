@@ -13,4 +13,5 @@ public sealed record CreateReservationResult(
     Guid ReservationId,
     decimal Amount,
     string Currency,
-    DateTime ExpiresAt);
+    DateTime ExpiresAt,
+    string? CheckoutUrl = null);

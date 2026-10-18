@@ -21,6 +21,8 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
             .IsRequired();
         builder.Property(payment => payment.StripeCheckoutSessionId)
             .HasMaxLength(255);
+        builder.Property(payment => payment.StripeCheckoutUrl)
+            .HasMaxLength(2_000);
         builder.Property(payment => payment.StripePaymentIntentId)
             .HasMaxLength(255);
         builder.Property(payment => payment.IdempotencyKey)

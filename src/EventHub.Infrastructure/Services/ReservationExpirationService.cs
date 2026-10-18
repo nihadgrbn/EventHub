@@ -7,17 +7,20 @@ namespace EventHub.Infrastructure.Services;
 public sealed class ReservationExpirationService : IReservationExpirationService
 {
     private readonly IReservationRepository _reservations;
+    private readonly IPaymentRepository _payments;
     private readonly ITicketTypeRepository _ticketTypes;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ReservationExpirationService> _logger;
 
     public ReservationExpirationService(
         IReservationRepository reservations,
+        IPaymentRepository payments,
         ITicketTypeRepository ticketTypes,
         IUnitOfWork unitOfWork,
         ILogger<ReservationExpirationService> logger)
     {
         _reservations = reservations;
+        _payments = payments;
         _ticketTypes = ticketTypes;
         _unitOfWork = unitOfWork;
         _logger = logger;
@@ -47,6 +50,15 @@ public sealed class ReservationExpirationService : IReservationExpirationService
                     {
                         throw new InvalidOperationException(
                             $"Unable to restore inventory for reservation {reservation.Id}.");
+                    }
+
+                    if (!await _payments.TryMarkAsExpiredAsync(
+                            reservation.PaymentId,
+                            utcNow,
+                            transactionCancellationToken))
+                    {
+                        throw new InvalidOperationException(
+                            $"Unable to expire payment for reservation {reservation.Id}.");
                     }
 
                     await _reservations.UpdateStatusAsync(
