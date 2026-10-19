@@ -15,7 +15,7 @@ namespace EventHub.Api.IntegrationTests;
 
 public sealed class ApiTestFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("eventhub_test")
         .WithUsername("eventhub_test")
         .WithPassword("eventhub_test_password")
