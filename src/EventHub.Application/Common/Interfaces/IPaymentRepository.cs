@@ -39,6 +39,10 @@ public interface IPaymentRepository
         string paymentIntentId,
         CancellationToken cancellationToken);
 
+    Task<Payment?> GetPendingByIdAsync(
+        Guid paymentId,
+        CancellationToken cancellationToken);
+
     Task<bool> TryMarkAsFailedByPaymentIntentIdAsync(
         string paymentIntentId,
         DateTime failedAt,

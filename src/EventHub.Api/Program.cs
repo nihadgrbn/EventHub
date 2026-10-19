@@ -13,6 +13,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Text;
@@ -21,6 +22,13 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 const string FrontendCorsPolicy = "FrontendCorsPolicy";
+
+if (builder.Environment.IsProduction()
+    && !builder.Configuration.GetValue<bool>("Stripe:Enabled"))
+{
+    throw new InvalidOperationException(
+        "Stripe must be enabled in Production. Refusing to start with the development payment gateway.");
+}
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -56,6 +64,11 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+});
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -88,20 +101,6 @@ builder.Services.AddRateLimiter(options =>
 
     static string ResolveClientIp(HttpContext httpContext)
     {
-        if (httpContext.Request.Headers.TryGetValue("X-Forwarded-For", out var forwarded) && !string.IsNullOrWhiteSpace(forwarded))
-        {
-            var first = forwarded.ToString().Split(',')[0].Trim();
-            if (!string.IsNullOrWhiteSpace(first))
-            {
-                return first;
-            }
-        }
-
-        if (httpContext.Request.Headers.TryGetValue("X-Real-IP", out var realIp) && !string.IsNullOrWhiteSpace(realIp))
-        {
-            return realIp.ToString().Trim();
-        }
-
         return httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous-client";
     }
 
@@ -289,6 +288,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors(FrontendCorsPolicy);
+app.UseForwardedHeaders();
 app.UseRateLimiter();
 app.UseStaticFiles();
 app.UseAuthentication();

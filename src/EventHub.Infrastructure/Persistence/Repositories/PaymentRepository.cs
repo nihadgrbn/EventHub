@@ -84,6 +84,17 @@ public sealed class PaymentRepository : IPaymentRepository
                 cancellationToken);
     }
 
+    public async Task<Payment?> GetPendingByIdAsync(
+        Guid paymentId,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Payments
+            .SingleOrDefaultAsync(
+                payment => payment.Id == paymentId
+                    && payment.Status == PaymentStatus.Pending,
+                cancellationToken);
+    }
+
     public async Task<bool> TryMarkAsFailedAsync(
         Guid paymentId,
         DateTime failedAt,

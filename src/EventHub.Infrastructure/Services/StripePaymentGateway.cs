@@ -69,8 +69,17 @@ public sealed class StripePaymentGateway : IPaymentGateway
                     {
                         ["payment_id"] = request.PaymentId.ToString(),
                         ["reservation_id"] = request.ReservationId.ToString()
+                    },
+                    PaymentIntentData = new SessionPaymentIntentDataOptions
+                    {
+                        Metadata = new Dictionary<string, string>
+                        {
+                            ["payment_id"] = request.PaymentId.ToString(),
+                            ["reservation_id"] = request.ReservationId.ToString()
+                        }
                     }
                 },
+                new RequestOptions { IdempotencyKey = $"checkout-session:{request.PaymentId:N}" },
                 cancellationToken: cancellationToken);
 
             if (string.IsNullOrWhiteSpace(session.Id) || string.IsNullOrWhiteSpace(session.Url))
@@ -84,6 +93,26 @@ public sealed class StripePaymentGateway : IPaymentGateway
         {
             throw new PaymentProviderException(
                 $"Stripe checkout could not be created: {exception.StripeError?.Message ?? "The provider rejected the request."}");
+        }
+    }
+
+    public async Task ExpireCheckoutSessionAsync(
+        string checkoutSessionId,
+        CancellationToken cancellationToken)
+    {
+        EnsureApiConfigured();
+
+        try
+        {
+            var service = new SessionService();
+            await service.ExpireAsync(
+                checkoutSessionId,
+                cancellationToken: cancellationToken);
+        }
+        catch (StripeException exception)
+        {
+            throw new PaymentProviderException(
+                $"Stripe checkout could not be cancelled: {exception.StripeError?.Message ?? "The provider rejected the request."}");
         }
     }
 
@@ -131,24 +160,41 @@ public sealed class StripePaymentGateway : IPaymentGateway
                 && !string.IsNullOrWhiteSpace(expiredSession.Id):
                 await _paymentState.HandleExpiredCheckoutAsync(
                     expiredSession.Id,
+                    stripeEvent.Id,
                     processedAt,
                     cancellationToken);
                 return;
 
             case "payment_intent.payment_failed" when stripeEvent.Data.Object is PaymentIntent failedPaymentIntent
                 && !string.IsNullOrWhiteSpace(failedPaymentIntent.Id):
+                var failedPaymentId = failedPaymentIntent.Metadata.TryGetValue("payment_id", out var failedPaymentIdValue)
+                    && Guid.TryParse(failedPaymentIdValue, out var parsedPaymentId)
+                    ? parsedPaymentId
+                    : (Guid?)null;
                 await _paymentState.HandleFailedPaymentIntentAsync(
                     failedPaymentIntent.Id,
+                    failedPaymentId,
+                    stripeEvent.Id,
                     processedAt,
                     cancellationToken);
                 return;
 
             case "charge.refunded" when stripeEvent.Data.Object is Charge refundedCharge
-                && !string.IsNullOrWhiteSpace(refundedCharge.PaymentIntentId):
+                && !string.IsNullOrWhiteSpace(refundedCharge.PaymentIntentId)
+                && refundedCharge.AmountRefunded >= refundedCharge.Amount:
                 await _paymentState.HandleRefundedPaymentIntentAsync(
                     refundedCharge.PaymentIntentId,
+                    stripeEvent.Id,
                     processedAt,
                     cancellationToken);
+                return;
+
+            case "charge.refunded" when stripeEvent.Data.Object is Charge partiallyRefundedCharge:
+                _logger.LogWarning(
+                    "Ignoring partial Stripe refund for ChargeId={ChargeId}. AmountRefunded={AmountRefunded}, Amount={Amount}.",
+                    partiallyRefundedCharge.Id,
+                    partiallyRefundedCharge.AmountRefunded,
+                    partiallyRefundedCharge.Amount);
                 return;
 
             case "checkout.session.completed"

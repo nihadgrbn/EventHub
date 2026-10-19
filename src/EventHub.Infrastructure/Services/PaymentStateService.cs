@@ -10,6 +10,7 @@ public sealed class PaymentStateService : IPaymentStateService
     private readonly IReservationRepository _reservations;
     private readonly ITicketTypeRepository _ticketTypes;
     private readonly ITicketRepository _tickets;
+    private readonly IStripeEventRepository _stripeEvents;
     private readonly IUnitOfWork _unitOfWork;
 
     public PaymentStateService(
@@ -17,17 +18,20 @@ public sealed class PaymentStateService : IPaymentStateService
         IReservationRepository reservations,
         ITicketTypeRepository ticketTypes,
         ITicketRepository tickets,
+        IStripeEventRepository stripeEvents,
         IUnitOfWork unitOfWork)
     {
         _payments = payments;
         _reservations = reservations;
         _ticketTypes = ticketTypes;
         _tickets = tickets;
+        _stripeEvents = stripeEvents;
         _unitOfWork = unitOfWork;
     }
 
     public Task HandleExpiredCheckoutAsync(
         string checkoutSessionId,
+        string stripeEventId,
         DateTime occurredAt,
         CancellationToken cancellationToken) =>
         TransitionAsync(
@@ -39,28 +43,40 @@ public sealed class PaymentStateService : IPaymentStateService
                 occurredAt,
                 cancellation),
             ReservationStatus.Expired,
+            stripeEventId,
             occurredAt,
             cancellationToken);
 
     public Task HandleRefundedPaymentIntentAsync(
         string paymentIntentId,
+        string stripeEventId,
         DateTime occurredAt,
         CancellationToken cancellationToken) =>
-        RefundAsync(paymentIntentId, occurredAt, cancellationToken);
+        RefundAsync(paymentIntentId, stripeEventId, occurredAt, cancellationToken);
 
     public Task HandleFailedPaymentIntentAsync(
         string paymentIntentId,
+        Guid? paymentId,
+        string stripeEventId,
         DateTime occurredAt,
         CancellationToken cancellationToken) =>
         TransitionAsync(
-            cancellation => _payments.GetByPaymentIntentIdAsync(
-                paymentIntentId,
-                cancellation),
-            (payment, cancellation) => _payments.TryMarkAsFailedAsync(
-                payment.Id,
-                occurredAt,
-                cancellation),
+            cancellation => paymentId is { } id
+                ? _payments.GetPendingByIdAsync(id, cancellation)
+                : _payments.GetByPaymentIntentIdAsync(paymentIntentId, cancellation),
+            async (payment, cancellation) =>
+            {
+                await _payments.SetPaymentIntentIdAsync(
+                    payment.Id,
+                    paymentIntentId,
+                    cancellation);
+                return await _payments.TryMarkAsFailedAsync(
+                    payment.Id,
+                    occurredAt,
+                    cancellation);
+            },
             ReservationStatus.Cancelled,
+            stripeEventId,
             occurredAt,
             cancellationToken);
 
@@ -68,11 +84,19 @@ public sealed class PaymentStateService : IPaymentStateService
         Func<CancellationToken, Task<Payment?>> findPaymentAsync,
         Func<Payment, CancellationToken, Task<bool>> markPaymentAsync,
         ReservationStatus reservationStatus,
+        string stripeEventId,
         DateTime occurredAt,
         CancellationToken cancellationToken)
     {
         await _unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
         {
+            if (!await _stripeEvents.TryMarkAsProcessedAsync(
+                    stripeEventId,
+                    transactionCancellationToken))
+            {
+                return;
+            }
+
             var payment = await findPaymentAsync(transactionCancellationToken);
             if (payment is null)
             {
@@ -113,11 +137,19 @@ public sealed class PaymentStateService : IPaymentStateService
 
     private async Task RefundAsync(
         string paymentIntentId,
+        string stripeEventId,
         DateTime occurredAt,
         CancellationToken cancellationToken)
     {
         await _unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
         {
+            if (!await _stripeEvents.TryMarkAsProcessedAsync(
+                    stripeEventId,
+                    transactionCancellationToken))
+            {
+                return;
+            }
+
             var payment = await _payments.GetPaidByPaymentIntentIdAsync(
                 paymentIntentId,
                 transactionCancellationToken);

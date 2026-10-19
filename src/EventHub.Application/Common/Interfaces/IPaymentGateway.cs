@@ -6,6 +6,10 @@ public interface IPaymentGateway
         PaymentCheckoutRequest request,
         CancellationToken cancellationToken);
 
+    Task ExpireCheckoutSessionAsync(
+        string checkoutSessionId,
+        CancellationToken cancellationToken);
+
     Task HandleWebhookAsync(
         string payload,
         string signature,

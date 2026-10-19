@@ -11,6 +11,10 @@ public sealed class DevelopmentPaymentGateway : IPaymentGateway
             $"dev_{request.PaymentId:N}",
             $"/api/Payments/reservations/{request.ReservationId}/confirm"));
 
+    public Task ExpireCheckoutSessionAsync(
+        string checkoutSessionId,
+        CancellationToken cancellationToken) => Task.CompletedTask;
+
     public Task HandleWebhookAsync(
         string payload,
         string signature,

@@ -1,5 +1,6 @@
 using EventHub.Api.Constants;
 using EventHub.Application.Payments.Commands.CreateReservation;
+using EventHub.Application.Payments.Commands.CancelReservation;
 using EventHub.Application.Payments.Queries.GetReservationStatus;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Domain.Constants;
@@ -60,9 +61,20 @@ public sealed class PaymentsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("reservations/{reservationId:guid}/cancel")]
+    [EnableRateLimiting(RateLimitPolicies.ReservationStrict)]
+    public async Task<IActionResult> CancelReservation(
+        Guid reservationId,
+        CancellationToken cancellationToken)
+    {
+        await _sender.Send(new CancelReservationCommand(reservationId), cancellationToken);
+        return NoContent();
+    }
+
     [HttpPost("webhook/stripe")]
     [AllowAnonymous]
     [IgnoreAntiforgeryToken]
+    [RequestSizeLimit(1_048_576)]
     public async Task<IActionResult> StripeWebhook(CancellationToken cancellationToken)
     {
         using var reader = new StreamReader(Request.Body);

@@ -76,13 +76,37 @@ public sealed class CreateReservationCommandHandler
                         "The idempotency key was already used with different reservation details.");
                 }
 
+                if (!string.IsNullOrWhiteSpace(existingPayment.StripeCheckoutUrl))
+                {
+                    return new CreateReservationResult(
+                        existingPayment.Id,
+                        existingReservation.Id,
+                        existingPayment.Amount,
+                        existingPayment.Currency,
+                        existingPayment.ExpiresAt,
+                        existingPayment.StripeCheckoutUrl);
+                }
+
+                if (existingPayment.Status != PaymentStatus.Pending)
+                {
+                    throw new ConflictException("The idempotent reservation can no longer be paid.");
+                }
+
+                var existingCheckoutSession = await CreateCheckoutSessionAsync(
+                    existingPayment.Id,
+                    existingReservation,
+                    existingPayment.Amount,
+                    existingPayment.Currency,
+                    existingPayment.ExpiresAt,
+                    cancellationToken);
+
                 return new CreateReservationResult(
                     existingPayment.Id,
                     existingReservation.Id,
                     existingPayment.Amount,
                     existingPayment.Currency,
                     existingPayment.ExpiresAt,
-                    existingPayment.StripeCheckoutUrl);
+                    existingCheckoutSession.CheckoutUrl);
             }
         }
 
@@ -139,35 +163,13 @@ public sealed class CreateReservationCommandHandler
             await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
         }, cancellationToken);
 
-        PaymentCheckoutSession checkoutSession;
-        try
-        {
-            checkoutSession = await _paymentGateway.CreateCheckoutSessionAsync(
-                new PaymentCheckoutRequest(
-                    payment.Id,
-                    reservation.Id,
-                    payment.Amount,
-                    payment.Currency,
-                    payment.ExpiresAt),
-                cancellationToken);
-
-            await _payments.SetCheckoutSessionAsync(
-                payment.Id,
-                checkoutSession.SessionId,
-                checkoutSession.CheckoutUrl,
-                cancellationToken);
-
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch
-        {
-            await CompensateFailedCheckoutAsync(payment.Id, reservation, cancellationToken);
-            throw;
-        }
+        var checkoutSession = await CreateCheckoutSessionAsync(
+            payment.Id,
+            reservation,
+            payment.Amount,
+            payment.Currency,
+            payment.ExpiresAt,
+            cancellationToken);
 
         return new CreateReservationResult(
             payment.Id,
@@ -178,38 +180,30 @@ public sealed class CreateReservationCommandHandler
             checkoutSession.CheckoutUrl);
     }
 
-    private async Task CompensateFailedCheckoutAsync(
+    private async Task<PaymentCheckoutSession> CreateCheckoutSessionAsync(
         Guid paymentId,
         Reservation reservation,
+        decimal amount,
+        string currency,
+        DateTime expiresAt,
         CancellationToken cancellationToken)
     {
-        var failedAt = DateTime.UtcNow;
-
-        await _unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
-        {
-            if (!await _payments.TryMarkAsFailedAsync(
-                    paymentId,
-                    failedAt,
-                    transactionCancellationToken))
-            {
-                return;
-            }
-
-            if (!await _ticketTypes.TryIncreaseAvailableQuantityAsync(
-                    reservation.TicketTypeId,
-                    reservation.Quantity,
-                    transactionCancellationToken))
-            {
-                throw new InvalidOperationException(
-                    $"Unable to restore inventory for reservation {reservation.Id}.");
-            }
-
-            await _reservations.UpdateStatusAsync(
+        var checkoutSession = await _paymentGateway.CreateCheckoutSessionAsync(
+            new PaymentCheckoutRequest(
+                paymentId,
                 reservation.Id,
-                ReservationStatus.Cancelled,
-                failedAt,
-                transactionCancellationToken);
-            await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
-        }, cancellationToken);
+                amount,
+                currency,
+                expiresAt),
+            cancellationToken);
+
+        await _payments.SetCheckoutSessionAsync(
+            paymentId,
+            checkoutSession.SessionId,
+            checkoutSession.CheckoutUrl,
+            cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return checkoutSession;
     }
 }
