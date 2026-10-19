@@ -14,17 +14,20 @@ public sealed class StripePaymentGateway : IPaymentGateway
     private readonly StripeOptions _options;
     private readonly ISender _sender;
     private readonly IPaymentRepository _payments;
+    private readonly IPaymentStateService _paymentState;
     private readonly ILogger<StripePaymentGateway> _logger;
 
     public StripePaymentGateway(
         IOptions<StripeOptions> options,
         ISender sender,
         IPaymentRepository payments,
+        IPaymentStateService paymentState,
         ILogger<StripePaymentGateway> logger)
     {
         _options = options.Value;
         _sender = sender;
         _payments = payments;
+        _paymentState = paymentState;
         _logger = logger;
     }
 
@@ -91,6 +94,11 @@ public sealed class StripePaymentGateway : IPaymentGateway
     {
         EnsureWebhookConfigured();
 
+        if (string.IsNullOrWhiteSpace(payload) || string.IsNullOrWhiteSpace(signature))
+        {
+            throw new UnauthorizedException("The Stripe webhook request is invalid.");
+        }
+
         Event stripeEvent;
         try
         {
@@ -111,12 +119,17 @@ public sealed class StripePaymentGateway : IPaymentGateway
             throw new UnauthorizedException("The Stripe webhook signature is invalid.");
         }
 
+        if (string.IsNullOrWhiteSpace(stripeEvent.Id))
+        {
+            throw new UnauthorizedException("The Stripe webhook event ID is missing.");
+        }
+
         var processedAt = DateTime.UtcNow;
         switch (stripeEvent.Type)
         {
             case "checkout.session.expired" when stripeEvent.Data.Object is Session expiredSession
                 && !string.IsNullOrWhiteSpace(expiredSession.Id):
-                await _payments.TryMarkAsExpiredByCheckoutSessionIdAsync(
+                await _paymentState.HandleExpiredCheckoutAsync(
                     expiredSession.Id,
                     processedAt,
                     cancellationToken);
@@ -124,7 +137,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
 
             case "payment_intent.payment_failed" when stripeEvent.Data.Object is PaymentIntent failedPaymentIntent
                 && !string.IsNullOrWhiteSpace(failedPaymentIntent.Id):
-                await _payments.TryMarkAsFailedByPaymentIntentIdAsync(
+                await _paymentState.HandleFailedPaymentIntentAsync(
                     failedPaymentIntent.Id,
                     processedAt,
                     cancellationToken);
@@ -132,7 +145,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
 
             case "charge.refunded" when stripeEvent.Data.Object is Charge refundedCharge
                 && !string.IsNullOrWhiteSpace(refundedCharge.PaymentIntentId):
-                await _payments.TryMarkAsRefundedByPaymentIntentIdAsync(
+                await _paymentState.HandleRefundedPaymentIntentAsync(
                     refundedCharge.PaymentIntentId,
                     processedAt,
                     cancellationToken);
@@ -147,6 +160,10 @@ public sealed class StripePaymentGateway : IPaymentGateway
         }
 
         if (stripeEvent.Data.Object is not Session session
+            || string.IsNullOrWhiteSpace(session.Id)
+            || string.IsNullOrWhiteSpace(session.PaymentIntentId)
+            || session.AmountTotal is null
+            || string.IsNullOrWhiteSpace(session.Currency)
             || !string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
             || !session.Metadata.TryGetValue("reservation_id", out var reservationIdValue)
             || !Guid.TryParse(reservationIdValue, out var reservationId)

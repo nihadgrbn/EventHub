@@ -9,6 +9,10 @@ public sealed class PurchaseConfiguration : IEntityTypeConfiguration<Purchase>
     public void Configure(EntityTypeBuilder<Purchase> builder)
     {
         builder.HasKey(purchase => purchase.Id);
+        builder.HasOne(purchase => purchase.Payment)
+            .WithMany()
+            .HasForeignKey(purchase => purchase.PaymentId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Property(purchase => purchase.IdempotencyKey).HasMaxLength(100);
         builder.Property(purchase => purchase.TotalAmount).HasColumnType("decimal(18,2)");
         builder.HasIndex(purchase => purchase.AttendeeId);

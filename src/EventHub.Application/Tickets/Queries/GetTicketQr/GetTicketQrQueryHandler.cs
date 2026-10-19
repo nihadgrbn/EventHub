@@ -28,6 +28,8 @@ public sealed class GetTicketQrQueryHandler : IRequestHandler<GetTicketQrQuery, 
 
         if (ticket.AttendeeId != attendeeId)
             throw new ForbiddenException("You can only access your own ticket QR codes.");
+        if (ticket.Status != TicketStatus.Active)
+            throw new ConflictException("A QR code is not available for a refunded ticket.");
         if (ticket.Event?.Status != EventStatus.Published)
             throw new ConflictException("A QR code is only available for a published event.");
         if (ticket.CheckedInAt.HasValue)

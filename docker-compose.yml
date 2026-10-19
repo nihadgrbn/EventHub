@@ -17,6 +17,15 @@ services:
       timeout: 5s
       retries: 10
 
+  dataprotection-init:
+    image: mcr.microsoft.com/dotnet/aspnet:10.0
+    user: root
+    volumes:
+      - eventhub-dataprotection-keys:/home/app/.aspnet/DataProtection-Keys
+    command: >-
+      sh -c "mkdir -p /home/app/.aspnet/DataProtection-Keys
+      && chown -R 1654:1654 /home/app/.aspnet"
+
   api:
     build:
       context: .
@@ -26,8 +35,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      dataprotection-init:
+        condition: service_completed_successfully
     environment:
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_HTTP_PORTS: 8080
       Database__ApplyMigrations: ${DATABASE_APPLY_MIGRATIONS:-true}
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:-EventHubDb};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
@@ -41,6 +52,11 @@ services:
       EmailSettings__Password: ${SMTP_PASSWORD:?SMTP_PASSWORD must be set in .env}
       EmailSettings__VerificationUrl: ${EMAIL_VERIFICATION_URL:-http://localhost:3000/verify-email}
       EmailSettings__PasswordResetUrl: ${PASSWORD_RESET_URL:-http://localhost:3000/reset-password}
+      Stripe__Enabled: ${STRIPE_ENABLED:-false}
+      Stripe__SecretKey: ${STRIPE_SECRET_KEY:-}
+      Stripe__WebhookSecret: ${STRIPE_WEBHOOK_SECRET:-}
+      Stripe__SuccessUrl: ${STRIPE_SUCCESS_URL:-http://localhost:3000/payment/success}
+      Stripe__CancelUrl: ${STRIPE_CANCEL_URL:-http://localhost:3000/payment/cancelled}
     ports:
       - "${API_PORT:-8080}:8080"
     volumes:

@@ -1,4 +1,5 @@
 ﻿using EventHub.Domain.Common;
+using EventHub.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -17,6 +18,7 @@ namespace EventHub.Domain.Entities
         public decimal PriceAtPurchase { get; set; }
         public Guid AttendeeId { get; set; } 
         public User? Attendee { get; set; }
+        public TicketStatus Status { get; set; } = TicketStatus.Active;
         public DateTime PurchaseDate { get; set; }
         public string? QrTokenHash { get; set; }
         public DateTime? CheckedInAt { get; set; }

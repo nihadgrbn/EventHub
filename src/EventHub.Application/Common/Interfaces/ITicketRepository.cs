@@ -18,4 +18,5 @@ public interface ITicketRepository
     Task<Ticket?> GetTicketByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<Ticket?> GetByQrTokenHashAsync(string qrTokenHash, CancellationToken cancellationToken);
     Task<bool> TryCheckInAsync(Guid eventId, string qrTokenHash, Guid checkedInById, DateTime checkedInAt, CancellationToken cancellationToken);
+    Task<bool> TryRefundByPaymentIdAsync(Guid paymentId, CancellationToken cancellationToken);
 }

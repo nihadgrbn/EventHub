@@ -1,5 +1,6 @@
 using EventHub.Application.Common.Interfaces;
 using EventHub.Domain.Entities;
+using EventHub.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace EventHub.Infrastructure.Persistence.Repositories;
@@ -95,8 +96,21 @@ public sealed class TicketRepository : ITicketRepository
 
     public async Task<bool> TryCheckInAsync(Guid eventId, string qrTokenHash, Guid checkedInById, DateTime checkedInAt, CancellationToken cancellationToken) =>
         await _context.Tickets
-            .Where(ticket => ticket.EventId == eventId && ticket.QrTokenHash == qrTokenHash && ticket.CheckedInAt == null)
+            .Where(ticket => ticket.EventId == eventId
+                && ticket.QrTokenHash == qrTokenHash
+                && ticket.Status == TicketStatus.Active
+                && ticket.CheckedInAt == null)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(ticket => ticket.CheckedInAt, checkedInAt)
                 .SetProperty(ticket => ticket.CheckedInById, checkedInById), cancellationToken) == 1;
+
+    public async Task<bool> TryRefundByPaymentIdAsync(
+        Guid paymentId,
+        CancellationToken cancellationToken) =>
+        await _context.Tickets
+            .Where(ticket => ticket.Purchase != null
+                && ticket.Purchase.PaymentId == paymentId
+                && ticket.Status == TicketStatus.Active)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(ticket => ticket.Status, TicketStatus.Refunded), cancellationToken) > 0;
 }

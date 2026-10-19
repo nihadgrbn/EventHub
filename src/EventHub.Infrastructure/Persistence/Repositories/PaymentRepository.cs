@@ -62,6 +62,28 @@ public sealed class PaymentRepository : IPaymentRepository
                 .SetProperty(payment => payment.UpdatedAt, expiredAt), cancellationToken) == 1;
     }
 
+    public async Task<Payment?> GetByCheckoutSessionIdAsync(
+        string checkoutSessionId,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Payments
+            .SingleOrDefaultAsync(
+                payment => payment.StripeCheckoutSessionId == checkoutSessionId
+                    && payment.Status == PaymentStatus.Pending,
+                cancellationToken);
+    }
+
+    public async Task<Payment?> GetByPaymentIntentIdAsync(
+        string paymentIntentId,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Payments
+            .SingleOrDefaultAsync(
+                payment => payment.StripePaymentIntentId == paymentIntentId
+                    && payment.Status == PaymentStatus.Pending,
+                cancellationToken);
+    }
+
     public async Task<bool> TryMarkAsFailedAsync(
         Guid paymentId,
         DateTime failedAt,
@@ -114,6 +136,17 @@ public sealed class PaymentRepository : IPaymentRepository
                 .SetProperty(payment => payment.UpdatedAt, refundedAt), cancellationToken) == 1;
     }
 
+    public async Task<Payment?> GetPaidByPaymentIntentIdAsync(
+        string paymentIntentId,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Payments
+            .SingleOrDefaultAsync(
+                payment => payment.StripePaymentIntentId == paymentIntentId
+                    && payment.Status == PaymentStatus.Paid,
+                cancellationToken);
+    }
+
     public async Task SetCheckoutSessionAsync(
         Guid paymentId,
         string checkoutSessionId,
@@ -137,7 +170,8 @@ public sealed class PaymentRepository : IPaymentRepository
     {
         await _context.Payments
             .Where(payment => payment.Id == paymentId
-                && payment.Status == PaymentStatus.Pending)
+                && payment.Status == PaymentStatus.Pending
+                && payment.StripePaymentIntentId == null)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(payment => payment.StripePaymentIntentId, paymentIntentId)
                 .SetProperty(payment => payment.UpdatedAt, DateTime.UtcNow), cancellationToken);

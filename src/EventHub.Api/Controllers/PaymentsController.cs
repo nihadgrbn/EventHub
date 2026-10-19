@@ -1,6 +1,5 @@
 using EventHub.Api.Constants;
 using EventHub.Application.Payments.Commands.CreateReservation;
-using EventHub.Application.Payments.Commands.ConfirmReservation;
 using EventHub.Application.Payments.Queries.GetReservationStatus;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Domain.Constants;
@@ -8,7 +7,6 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.Extensions.Hosting;
 
 namespace EventHub.Api.Controllers;
 
@@ -18,16 +16,13 @@ namespace EventHub.Api.Controllers;
 public sealed class PaymentsController : ControllerBase
 {
     private readonly ISender _sender;
-    private readonly IHostEnvironment _environment;
     private readonly IPaymentGateway _paymentGateway;
 
     public PaymentsController(
         ISender sender,
-        IHostEnvironment environment,
         IPaymentGateway paymentGateway)
     {
         _sender = sender;
-        _environment = environment;
         _paymentGateway = paymentGateway;
     }
 
@@ -60,23 +55,6 @@ public sealed class PaymentsController : ControllerBase
     {
         var result = await _sender.Send(
             new GetReservationStatusQuery(reservationId),
-            cancellationToken);
-
-        return Ok(result);
-    }
-
-    [HttpPost("reservations/{reservationId:guid}/confirm")]
-    public async Task<IActionResult> ConfirmReservation(
-        Guid reservationId,
-        CancellationToken cancellationToken)
-    {
-        if (!_environment.IsDevelopment())
-        {
-            return NotFound();
-        }
-
-        var result = await _sender.Send(
-            new ConfirmReservationCommand(reservationId),
             cancellationToken);
 
         return Ok(result);

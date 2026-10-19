@@ -30,6 +30,11 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Property(t => t.PriceAtPurchase)
             .HasColumnType("decimal(18,2)");
 
+        builder.Property(t => t.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
         builder.Property(t => t.QrTokenHash).HasMaxLength(64);
         builder.HasIndex(t => t.QrTokenHash).IsUnique();
 

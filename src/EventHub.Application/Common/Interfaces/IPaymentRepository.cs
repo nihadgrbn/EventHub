@@ -31,6 +31,14 @@ public interface IPaymentRepository
         DateTime expiredAt,
         CancellationToken cancellationToken);
 
+    Task<Payment?> GetByCheckoutSessionIdAsync(
+        string checkoutSessionId,
+        CancellationToken cancellationToken);
+
+    Task<Payment?> GetByPaymentIntentIdAsync(
+        string paymentIntentId,
+        CancellationToken cancellationToken);
+
     Task<bool> TryMarkAsFailedByPaymentIntentIdAsync(
         string paymentIntentId,
         DateTime failedAt,
@@ -39,6 +47,10 @@ public interface IPaymentRepository
     Task<bool> TryMarkAsRefundedByPaymentIntentIdAsync(
         string paymentIntentId,
         DateTime refundedAt,
+        CancellationToken cancellationToken);
+
+    Task<Payment?> GetPaidByPaymentIntentIdAsync(
+        string paymentIntentId,
         CancellationToken cancellationToken);
 
     Task SetCheckoutSessionAsync(

@@ -70,6 +70,17 @@ public sealed class ReservationRepository : IReservationRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<Reservation?> GetActiveByPaymentIdAsync(
+        Guid paymentId,
+        CancellationToken cancellationToken)
+    {
+        return await _context.Reservations
+            .SingleOrDefaultAsync(
+                reservation => reservation.PaymentId == paymentId
+                    && reservation.Status == ReservationStatus.Active,
+                cancellationToken);
+    }
+
     public async Task UpdateStatusAsync(
         Guid reservationId,
         ReservationStatus status,

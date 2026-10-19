@@ -20,6 +20,10 @@ public interface IReservationRepository
         DateTime utcNow,
         CancellationToken cancellationToken);
 
+    Task<Reservation?> GetActiveByPaymentIdAsync(
+        Guid paymentId,
+        CancellationToken cancellationToken);
+
     Task<bool> TryConfirmAsync(
         Guid reservationId,
         DateTime confirmedAt,

@@ -261,6 +261,9 @@ namespace EventHub.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<Guid?>("PaymentId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime>("PurchasedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -273,6 +276,8 @@ namespace EventHub.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AttendeeId");
+
+                    b.HasIndex("PaymentId");
 
                     b.HasIndex("AttendeeId", "IdempotencyKey")
                         .IsUnique()
@@ -374,6 +379,11 @@ namespace EventHub.Infrastructure.Migrations
                     b.Property<string>("QrTokenHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<Guid>("TicketTypeId")
                         .HasColumnType("uuid");
@@ -540,7 +550,14 @@ namespace EventHub.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("EventHub.Domain.Entities.Payment", "Payment")
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Attendee");
+
+                    b.Navigation("Payment");
                 });
 
             modelBuilder.Entity("EventHub.Domain.Entities.Reservation", b =>

@@ -27,6 +27,8 @@ public sealed class CheckInTicketCommandHandler : IRequestHandler<CheckInTicketC
 
         if (ticket?.Event is null || ticket.EventId != request.EventId)
             throw new NotFoundException("Valid ticket not found.");
+        if (ticket.Status != TicketStatus.Active)
+            throw new ConflictException("This ticket is no longer valid.");
         if (!_currentUser.IsInRole(Roles.Admin) && ticket.Event.OrganizerId != userId)
             throw new ForbiddenException("You can only check in tickets for your own events.");
         if (ticket.Event.Status != EventStatus.Published)

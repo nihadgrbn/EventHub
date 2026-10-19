@@ -117,6 +117,7 @@ public sealed class ConfirmReservationCommandHandler
 
         var purchase = new Purchase
         {
+            PaymentId = reservation.PaymentId,
             AttendeeId = attendeeId,
             TotalAmount = reservation.Quantity * reservation.UnitPrice,
             PurchasedAt = confirmedAt,
