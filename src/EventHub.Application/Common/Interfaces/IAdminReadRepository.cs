@@ -36,4 +36,21 @@ public interface IAdminReadRepository
         int pageNumber,
         int pageSize,
         CancellationToken cancellationToken);
+
+    Task<AdminPaymentDashboardDto> GetPaymentDashboardAsync(CancellationToken cancellationToken);
+
+    Task<AdminPaymentDetailsDto?> GetPaymentDetailsAsync(Guid paymentId, CancellationToken cancellationToken);
+
+    Task<(IReadOnlyList<AdminWebhookDto> Items, int TotalCount)> GetWebhooksAsync(
+        string? status,
+        Guid? paymentId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    Task<(IReadOnlyList<AdminOutboxDto> Items, int TotalCount)> GetOutboxMessagesAsync(
+        string? status,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken);
 }

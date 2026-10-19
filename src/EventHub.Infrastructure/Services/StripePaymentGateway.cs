@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Stripe;
 using Stripe.Checkout;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace EventHub.Infrastructure.Services;
 
@@ -15,6 +17,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
     private readonly ISender _sender;
     private readonly IPaymentRepository _payments;
     private readonly IPaymentStateService _paymentState;
+    private readonly IStripeWebhookInboxRepository _webhookInbox;
     private readonly ILogger<StripePaymentGateway> _logger;
 
     public StripePaymentGateway(
@@ -22,12 +25,14 @@ public sealed class StripePaymentGateway : IPaymentGateway
         ISender sender,
         IPaymentRepository payments,
         IPaymentStateService paymentState,
+        IStripeWebhookInboxRepository webhookInbox,
         ILogger<StripePaymentGateway> logger)
     {
         _options = options.Value;
         _sender = sender;
         _payments = payments;
         _paymentState = paymentState;
+        _webhookInbox = webhookInbox;
         _logger = logger;
     }
 
@@ -154,58 +159,76 @@ public sealed class StripePaymentGateway : IPaymentGateway
         }
 
         var processedAt = DateTime.UtcNow;
-        switch (stripeEvent.Type)
+        var paymentIdFromEvent = ResolvePaymentId(stripeEvent);
+        var payloadHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
+        if (!await _webhookInbox.TryStartProcessingAsync(
+                stripeEvent.Id,
+                stripeEvent.Type,
+                paymentIdFromEvent,
+                payloadHash,
+                processedAt,
+                cancellationToken))
         {
-            case "checkout.session.expired" when stripeEvent.Data.Object is Session expiredSession
-                && !string.IsNullOrWhiteSpace(expiredSession.Id):
-                await _paymentState.HandleExpiredCheckoutAsync(
-                    expiredSession.Id,
-                    stripeEvent.Id,
-                    processedAt,
-                    cancellationToken);
-                return;
-
-            case "payment_intent.payment_failed" when stripeEvent.Data.Object is PaymentIntent failedPaymentIntent
-                && !string.IsNullOrWhiteSpace(failedPaymentIntent.Id):
-                var failedPaymentId = failedPaymentIntent.Metadata.TryGetValue("payment_id", out var failedPaymentIdValue)
-                    && Guid.TryParse(failedPaymentIdValue, out var parsedPaymentId)
-                    ? parsedPaymentId
-                    : (Guid?)null;
-                await _paymentState.HandleFailedPaymentIntentAsync(
-                    failedPaymentIntent.Id,
-                    failedPaymentId,
-                    stripeEvent.Id,
-                    processedAt,
-                    cancellationToken);
-                return;
-
-            case "charge.refunded" when stripeEvent.Data.Object is Charge refundedCharge
-                && !string.IsNullOrWhiteSpace(refundedCharge.PaymentIntentId)
-                && refundedCharge.AmountRefunded >= refundedCharge.Amount:
-                await _paymentState.HandleRefundedPaymentIntentAsync(
-                    refundedCharge.PaymentIntentId,
-                    stripeEvent.Id,
-                    processedAt,
-                    cancellationToken);
-                return;
-
-            case "charge.refunded" when stripeEvent.Data.Object is Charge partiallyRefundedCharge:
-                _logger.LogWarning(
-                    "Ignoring partial Stripe refund for ChargeId={ChargeId}. AmountRefunded={AmountRefunded}, Amount={Amount}.",
-                    partiallyRefundedCharge.Id,
-                    partiallyRefundedCharge.AmountRefunded,
-                    partiallyRefundedCharge.Amount);
-                return;
-
-            case "checkout.session.completed"
-                or "checkout.session.async_payment_succeeded":
-                break;
-
-            default:
-                return;
+            return;
         }
 
-        if (stripeEvent.Data.Object is not Session session
+        var handledSuccessfully = false;
+        try
+        {
+            switch (stripeEvent.Type)
+            {
+                case "checkout.session.expired" when stripeEvent.Data.Object is Session expiredSession
+                    && !string.IsNullOrWhiteSpace(expiredSession.Id):
+                    await _paymentState.HandleExpiredCheckoutAsync(
+                        expiredSession.Id,
+                        stripeEvent.Id,
+                        processedAt,
+                        cancellationToken);
+                    handledSuccessfully = true;
+                    return;
+
+                case "payment_intent.payment_failed" when stripeEvent.Data.Object is PaymentIntent failedPaymentIntent
+                    && !string.IsNullOrWhiteSpace(failedPaymentIntent.Id):
+                    await _paymentState.HandleFailedPaymentIntentAsync(
+                        failedPaymentIntent.Id,
+                        paymentIdFromEvent,
+                        stripeEvent.Id,
+                        processedAt,
+                        cancellationToken);
+                    handledSuccessfully = true;
+                    return;
+
+                case "charge.refunded" when stripeEvent.Data.Object is Charge refundedCharge
+                    && !string.IsNullOrWhiteSpace(refundedCharge.PaymentIntentId)
+                    && refundedCharge.AmountRefunded >= refundedCharge.Amount:
+                    _logger.LogCritical(
+                        "A full Stripe refund was detected for PaymentIntentId={PaymentIntentId}. Refunds are disabled by policy.",
+                        refundedCharge.PaymentIntentId);
+                    await _paymentState.HandleRefundedPaymentIntentAsync(
+                        refundedCharge.PaymentIntentId,
+                        stripeEvent.Id,
+                        processedAt,
+                        cancellationToken);
+                    handledSuccessfully = true;
+                    return;
+
+                case "charge.refunded" when stripeEvent.Data.Object is Charge partiallyRefundedCharge:
+                    _logger.LogCritical(
+                        "A partial Stripe refund was detected for ChargeId={ChargeId}. Partial refunds are prohibited.",
+                        partiallyRefundedCharge.Id);
+                    handledSuccessfully = true;
+                    return;
+
+                case "checkout.session.completed"
+                    or "checkout.session.async_payment_succeeded":
+                    break;
+
+                default:
+                    handledSuccessfully = true;
+                    return;
+            }
+
+            if (stripeEvent.Data.Object is not Session session
             || string.IsNullOrWhiteSpace(session.Id)
             || string.IsNullOrWhiteSpace(session.PaymentIntentId)
             || session.AmountTotal is null
@@ -214,31 +237,62 @@ public sealed class StripePaymentGateway : IPaymentGateway
             || !session.Metadata.TryGetValue("reservation_id", out var reservationIdValue)
             || !Guid.TryParse(reservationIdValue, out var reservationId)
             || !session.Metadata.TryGetValue("payment_id", out var paymentIdValue)
-            || !Guid.TryParse(paymentIdValue, out var paymentId))
-        {
-            return;
-        }
+            || !Guid.TryParse(paymentIdValue, out var confirmedPaymentId))
+            {
+                handledSuccessfully = true;
+                return;
+            }
 
-        try
-        {
-            await _sender.Send(
+            try
+            {
+                await _sender.Send(
                 new ConfirmReservationCommand(
                     reservationId,
                     session.Id,
                     session.PaymentIntentId,
-                    paymentId,
+                    confirmedPaymentId,
                     session.AmountTotal,
                     session.Currency,
                     stripeEvent.Id),
                 cancellationToken);
+            }
+            catch (ConflictException exception)
+                when (exception.Message is "The reservation has already been confirmed."
+                    or "The Stripe event has already been processed.")
+            {
+                // Stripe retries webhook delivery; an already completed reservation is idempotent.
+            }
+
+            handledSuccessfully = true;
         }
-        catch (ConflictException exception)
-            when (exception.Message is "The reservation has already been confirmed."
-                or "The Stripe event has already been processed.")
+        catch (Exception exception)
         {
-            // Stripe retries webhook delivery; an already completed reservation is idempotent.
+            await _webhookInbox.MarkFailedAsync(
+                stripeEvent.Id,
+                exception.Message,
+                CancellationToken.None);
+            throw;
+        }
+        finally
+        {
+            if (handledSuccessfully)
+            {
+                await _webhookInbox.MarkProcessedAsync(
+                    stripeEvent.Id,
+                    DateTime.UtcNow,
+                    CancellationToken.None);
+            }
         }
     }
+
+    private static Guid? ResolvePaymentId(Event stripeEvent) => stripeEvent.Data.Object switch
+    {
+        Session session when session.Metadata.TryGetValue("payment_id", out var paymentIdValue)
+            && Guid.TryParse(paymentIdValue, out var paymentId) => paymentId,
+        PaymentIntent paymentIntent when paymentIntent.Metadata.TryGetValue("payment_id", out var paymentIdValue)
+            && Guid.TryParse(paymentIdValue, out var paymentId) => paymentId,
+        _ => null
+    };
 
     private void EnsureApiConfigured()
     {

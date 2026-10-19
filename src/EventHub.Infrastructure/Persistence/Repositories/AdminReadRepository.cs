@@ -1,5 +1,6 @@
 using EventHub.Application.Admin.Models;
 using EventHub.Application.Common.Interfaces;
+using EventHub.Domain.Entities;
 using EventHub.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
@@ -194,6 +195,178 @@ public sealed class AdminReadRepository : IAdminReadRepository
                 reservation.ConfirmedAt))
             .ToListAsync(cancellationToken);
 
+        return (items, totalCount);
+    }
+
+    public async Task<AdminPaymentDashboardDto> GetPaymentDashboardAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var last24Hours = now.AddHours(-24);
+        var last30Days = now.AddDays(-30);
+
+        var pendingPayments = await _context.Payments.CountAsync(
+            payment => payment.Status == PaymentStatus.Pending,
+            cancellationToken);
+        var paidPayments = await _context.Payments.CountAsync(
+            payment => payment.Status == PaymentStatus.Paid,
+            cancellationToken);
+        var failedPayments = await _context.Payments.CountAsync(
+            payment => payment.Status == PaymentStatus.Failed && payment.UpdatedAt >= last24Hours,
+            cancellationToken);
+        var expiredPayments = await _context.Payments.CountAsync(
+            payment => payment.Status == PaymentStatus.Expired && payment.UpdatedAt >= last24Hours,
+            cancellationToken);
+        var refundedPayments = await _context.Payments.CountAsync(
+            payment => payment.Status == PaymentStatus.Refunded && payment.UpdatedAt >= last30Days,
+            cancellationToken);
+        var paidAmount = await _context.Payments
+            .Where(payment => payment.Status == PaymentStatus.Paid && payment.PaidAt >= last30Days)
+            .SumAsync(payment => (decimal?)payment.Amount, cancellationToken) ?? 0m;
+        var stalePending = await _context.Payments.CountAsync(
+            payment => payment.Status == PaymentStatus.Pending && payment.ExpiresAt < now,
+            cancellationToken);
+        var failedWebhooks = await _context.StripeWebhookInboxes.CountAsync(
+            webhook => webhook.Status == StripeWebhookInboxStatus.Failed,
+            cancellationToken);
+        var failedOutboxMessages = await _context.OutboxMessages.CountAsync(
+            message => message.Status == OutboxMessageStatus.Failed,
+            cancellationToken);
+
+        return new AdminPaymentDashboardDto(
+            pendingPayments,
+            paidPayments,
+            failedPayments,
+            expiredPayments,
+            refundedPayments,
+            paidAmount,
+            stalePending,
+            failedWebhooks,
+            failedOutboxMessages);
+    }
+
+    public async Task<AdminPaymentDetailsDto?> GetPaymentDetailsAsync(
+        Guid paymentId,
+        CancellationToken cancellationToken)
+    {
+        var payment = await _context.Payments
+            .AsNoTracking()
+            .Include(item => item.Attendee)
+            .SingleOrDefaultAsync(item => item.Id == paymentId, cancellationToken);
+        if (payment is null)
+        {
+            return null;
+        }
+
+        var reservation = await _context.Reservations
+            .AsNoTracking()
+            .Include(item => item.Attendee)
+            .Include(item => item.Event)
+            .SingleOrDefaultAsync(item => item.PaymentId == paymentId, cancellationToken);
+        var purchase = await _context.Purchases
+            .AsNoTracking()
+            .Include(item => item.Attendee)
+            .Include(item => item.Tickets)
+            .SingleOrDefaultAsync(item => item.PaymentId == paymentId, cancellationToken);
+        var webhooks = await _context.StripeWebhookInboxes
+            .AsNoTracking()
+            .Where(item => item.PaymentId == paymentId)
+            .OrderByDescending(item => item.CreatedAt)
+            .Select(item => new AdminWebhookDto(
+                item.Id,
+                item.EventId,
+                item.EventType,
+                item.PaymentId,
+                item.Status,
+                item.RetryCount,
+                item.CreatedAt,
+                item.ProcessedAt,
+                item.LastError))
+            .ToListAsync(cancellationToken);
+
+        return new AdminPaymentDetailsDto(
+            new AdminPaymentDto(
+                payment.Id,
+                payment.AttendeeId,
+                payment.Attendee is null ? string.Empty : $"{payment.Attendee.FirstName} {payment.Attendee.LastName}",
+                payment.Amount,
+                payment.Currency,
+                payment.Status.ToString(),
+                payment.CreatedAt,
+                payment.PaidAt,
+                payment.ExpiresAt),
+            reservation is null ? null : new AdminReservationDto(
+                reservation.Id,
+                reservation.AttendeeId,
+                reservation.Attendee is null ? string.Empty : $"{reservation.Attendee.FirstName} {reservation.Attendee.LastName}",
+                reservation.EventId,
+                reservation.Event?.Title ?? string.Empty,
+                reservation.TicketTypeId,
+                reservation.Quantity,
+                reservation.UnitPrice,
+                reservation.Status.ToString(),
+                reservation.ReservedUntil,
+                reservation.ConfirmedAt),
+            purchase is null ? null : new AdminPurchaseDto(
+                purchase.Id,
+                purchase.AttendeeId,
+                purchase.Attendee is null ? string.Empty : $"{purchase.Attendee.FirstName} {purchase.Attendee.LastName}",
+                purchase.TotalAmount,
+                purchase.PurchasedAt,
+                purchase.Tickets.Count),
+            webhooks);
+    }
+
+    public async Task<(IReadOnlyList<AdminWebhookDto> Items, int TotalCount)> GetWebhooksAsync(
+        string? status,
+        Guid? paymentId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var query = _context.StripeWebhookInboxes.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query = query.Where(item => item.Status == status.Trim());
+        }
+
+        if (paymentId.HasValue)
+        {
+            query = query.Where(item => item.PaymentId == paymentId.Value);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(item => item.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(item => new AdminWebhookDto(
+                item.Id, item.EventId, item.EventType, item.PaymentId, item.Status,
+                item.RetryCount, item.CreatedAt, item.ProcessedAt, item.LastError))
+            .ToListAsync(cancellationToken);
+        return (items, totalCount);
+    }
+
+    public async Task<(IReadOnlyList<AdminOutboxDto> Items, int TotalCount)> GetOutboxMessagesAsync(
+        string? status,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var query = _context.OutboxMessages.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            query = query.Where(item => item.Status == status.Trim());
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(item => item.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(item => new AdminOutboxDto(
+                item.Id, item.Type, item.Status, item.RetryCount, item.CreatedAt,
+                item.NextAttemptAt, item.ProcessedAt, item.LastError))
+            .ToListAsync(cancellationToken);
         return (items, totalCount);
     }
 }

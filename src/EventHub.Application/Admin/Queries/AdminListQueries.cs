@@ -31,3 +31,18 @@ public sealed record GetAdminReservationsQuery(
     string? Status = null,
     int PageNumber = 1,
     int PageSize = 20) : IRequest<PaginatedList<AdminReservationDto>>;
+
+public sealed record GetAdminPaymentDashboardQuery : IRequest<AdminPaymentDashboardDto>;
+
+public sealed record GetAdminPaymentDetailsQuery(Guid PaymentId) : IRequest<AdminPaymentDetailsDto?>;
+
+public sealed record GetAdminWebhooksQuery(
+    string? Status = null,
+    Guid? PaymentId = null,
+    int PageNumber = 1,
+    int PageSize = 20) : IRequest<PaginatedList<AdminWebhookDto>>;
+
+public sealed record GetAdminOutboxMessagesQuery(
+    string? Status = null,
+    int PageNumber = 1,
+    int PageSize = 20) : IRequest<PaginatedList<AdminOutboxDto>>;

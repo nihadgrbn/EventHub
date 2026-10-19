@@ -55,3 +55,41 @@ public sealed record AdminReservationDto(
     string Status,
     DateTime ReservedUntil,
     DateTime? ConfirmedAt);
+
+public sealed record AdminPaymentDashboardDto(
+    int PendingPayments,
+    int PaidPayments,
+    int FailedPaymentsLast24Hours,
+    int ExpiredPaymentsLast24Hours,
+    int RefundedPaymentsLast30Days,
+    decimal PaidAmountLast30Days,
+    int StalePendingPayments,
+    int FailedWebhooks,
+    int FailedOutboxMessages);
+
+public sealed record AdminWebhookDto(
+    Guid Id,
+    string EventId,
+    string EventType,
+    Guid? PaymentId,
+    string Status,
+    int RetryCount,
+    DateTime ReceivedAt,
+    DateTime? ProcessedAt,
+    string? LastError);
+
+public sealed record AdminOutboxDto(
+    Guid Id,
+    string Type,
+    string Status,
+    int RetryCount,
+    DateTime CreatedAt,
+    DateTime? NextAttemptAt,
+    DateTime? ProcessedAt,
+    string? LastError);
+
+public sealed record AdminPaymentDetailsDto(
+    AdminPaymentDto Payment,
+    AdminReservationDto? Reservation,
+    AdminPurchaseDto? Purchase,
+    IReadOnlyList<AdminWebhookDto> Webhooks);

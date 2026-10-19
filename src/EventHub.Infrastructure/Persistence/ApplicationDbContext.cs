@@ -21,6 +21,7 @@ namespace EventHub.Infrastructure.Persistence
         public DbSet<Reservation> Reservations { get; set; }
         public DbSet<OutboxMessage> OutboxMessages { get; set; }
         public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
+        public DbSet<StripeWebhookInbox> StripeWebhookInboxes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

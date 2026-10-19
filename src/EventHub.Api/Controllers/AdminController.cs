@@ -41,4 +41,23 @@ public sealed class AdminController : ControllerBase
     [HttpGet("reservations")]
     public async Task<IActionResult> GetReservations([FromQuery] GetAdminReservationsQuery query, CancellationToken cancellationToken)
         => Ok(await _sender.Send(query, cancellationToken));
+
+    [HttpGet("payment-dashboard")]
+    public async Task<IActionResult> GetPaymentDashboard(CancellationToken cancellationToken)
+        => Ok(await _sender.Send(new GetAdminPaymentDashboardQuery(), cancellationToken));
+
+    [HttpGet("payments/{paymentId:guid}")]
+    public async Task<IActionResult> GetPaymentDetails(Guid paymentId, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new GetAdminPaymentDetailsQuery(paymentId), cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    [HttpGet("payment-webhooks")]
+    public async Task<IActionResult> GetPaymentWebhooks([FromQuery] GetAdminWebhooksQuery query, CancellationToken cancellationToken)
+        => Ok(await _sender.Send(query, cancellationToken));
+
+    [HttpGet("outbox")]
+    public async Task<IActionResult> GetOutboxMessages([FromQuery] GetAdminOutboxMessagesQuery query, CancellationToken cancellationToken)
+        => Ok(await _sender.Send(query, cancellationToken));
 }

@@ -219,6 +219,7 @@ builder.Services.AddScoped<IAdminReadRepository, AdminReadRepository>();
 builder.Services.AddScoped<IReservationExpirationService, ReservationExpirationService>();
 builder.Services.AddScoped<IOutboxRepository, OutboxRepository>();
 builder.Services.AddScoped<IStripeEventRepository, StripeEventRepository>();
+builder.Services.AddScoped<IStripeWebhookInboxRepository, StripeWebhookInboxRepository>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();

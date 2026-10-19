@@ -85,3 +85,53 @@ public sealed class GetAdminReservationsQueryHandler
         return new PaginatedList<AdminReservationDto>(items, count, page, size);
     }
 }
+
+public sealed class GetAdminPaymentDashboardQueryHandler
+    : IRequestHandler<GetAdminPaymentDashboardQuery, AdminPaymentDashboardDto>
+{
+    private readonly IAdminReadRepository _repository;
+    public GetAdminPaymentDashboardQueryHandler(IAdminReadRepository repository) => _repository = repository;
+
+    public Task<AdminPaymentDashboardDto> Handle(GetAdminPaymentDashboardQuery request, CancellationToken cancellationToken) =>
+        _repository.GetPaymentDashboardAsync(cancellationToken);
+}
+
+public sealed class GetAdminPaymentDetailsQueryHandler
+    : IRequestHandler<GetAdminPaymentDetailsQuery, AdminPaymentDetailsDto?>
+{
+    private readonly IAdminReadRepository _repository;
+    public GetAdminPaymentDetailsQueryHandler(IAdminReadRepository repository) => _repository = repository;
+
+    public Task<AdminPaymentDetailsDto?> Handle(GetAdminPaymentDetailsQuery request, CancellationToken cancellationToken) =>
+        _repository.GetPaymentDetailsAsync(request.PaymentId, cancellationToken);
+}
+
+public sealed class GetAdminWebhooksQueryHandler
+    : AdminListQueryHandlerBase, IRequestHandler<GetAdminWebhooksQuery, PaginatedList<AdminWebhookDto>>
+{
+    private readonly IAdminReadRepository _repository;
+    public GetAdminWebhooksQueryHandler(IAdminReadRepository repository) => _repository = repository;
+
+    public async Task<PaginatedList<AdminWebhookDto>> Handle(GetAdminWebhooksQuery request, CancellationToken cancellationToken)
+    {
+        var page = NormalizePageNumber(request.PageNumber);
+        var size = NormalizePageSize(request.PageSize);
+        var (items, count) = await _repository.GetWebhooksAsync(request.Status, request.PaymentId, page, size, cancellationToken);
+        return new PaginatedList<AdminWebhookDto>(items, count, page, size);
+    }
+}
+
+public sealed class GetAdminOutboxMessagesQueryHandler
+    : AdminListQueryHandlerBase, IRequestHandler<GetAdminOutboxMessagesQuery, PaginatedList<AdminOutboxDto>>
+{
+    private readonly IAdminReadRepository _repository;
+    public GetAdminOutboxMessagesQueryHandler(IAdminReadRepository repository) => _repository = repository;
+
+    public async Task<PaginatedList<AdminOutboxDto>> Handle(GetAdminOutboxMessagesQuery request, CancellationToken cancellationToken)
+    {
+        var page = NormalizePageNumber(request.PageNumber);
+        var size = NormalizePageSize(request.PageSize);
+        var (items, count) = await _repository.GetOutboxMessagesAsync(request.Status, page, size, cancellationToken);
+        return new PaginatedList<AdminOutboxDto>(items, count, page, size);
+    }
+}
