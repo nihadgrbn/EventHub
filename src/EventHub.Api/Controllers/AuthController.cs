@@ -1,4 +1,6 @@
 ﻿using EventHub.Api.Constants;
+using EventHub.Api.Services;
+using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Authentication.Command.Register;
 using EventHub.Application.Authentication.Commands.ForgotPassword;
 using EventHub.Application.Authentication.Commands.Logout;
@@ -17,10 +19,12 @@ namespace EventHub.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly ISender _sender;
+    private readonly FailedLoginAttemptTracker _failedLoginAttemptTracker;
 
-    public AuthController(ISender sender)
+    public AuthController(ISender sender, FailedLoginAttemptTracker failedLoginAttemptTracker)
     {
         _sender = sender;
+        _failedLoginAttemptTracker = failedLoginAttemptTracker;
     }
 
     [HttpPost("register")]
@@ -39,13 +43,33 @@ public class AuthController : ControllerBase
     [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
     public async Task<IActionResult> Login([FromBody] LoginQuery query)
     {
-        var response = await _sender.Send(query);
-
-        return Ok(new
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous-client";
+        if (_failedLoginAttemptTracker.TryGetRetryAfter(ipAddress, query.Email, out var retryAfter))
         {
-            Message = "Login successful",
-            Data = response
-        });
+            return TooManyLoginAttempts(retryAfter);
+        }
+
+        try
+        {
+            var response = await _sender.Send(query);
+            _failedLoginAttemptTracker.RecordSuccess(ipAddress, query.Email);
+
+            return Ok(new
+            {
+                Message = "Login successful",
+                Data = response
+            });
+        }
+        catch (UnauthorizedException)
+        {
+            var failureRetryAfter = _failedLoginAttemptTracker.RecordFailure(ipAddress, query.Email);
+            if (failureRetryAfter > TimeSpan.Zero)
+            {
+                return TooManyLoginAttempts(failureRetryAfter);
+            }
+
+            throw;
+        }
     }
 
     [HttpPost("refresh")]
@@ -62,10 +86,22 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
+    [EnableRateLimiting(RateLimitPolicies.Session)]
     public async Task<IActionResult> Logout([FromBody] LogoutCommand command)
     {
         await _sender.Send(command);
         return NoContent();
+    }
+
+    private IActionResult TooManyLoginAttempts(TimeSpan retryAfter)
+    {
+        var seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+        Response.Headers.RetryAfter = seconds.ToString();
+        return Problem(
+            statusCode: StatusCodes.Status429TooManyRequests,
+            title: "Too Many Login Attempts",
+            detail: "Too many failed login attempts. Please try again later.",
+            extensions: new Dictionary<string, object?> { ["retryAfterSeconds"] = seconds });
     }
 
     [HttpPost("forgot-password")]

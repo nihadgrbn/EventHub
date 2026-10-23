@@ -19,6 +19,8 @@ using Microsoft.OpenApi;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using System.Net;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 const string FrontendCorsPolicy = "FrontendCorsPolicy";
@@ -34,14 +36,40 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? [
-        "http://localhost:3000",
-        "https://localhost:3000",
-        "http://localhost:5173",
-        "https://localhost:5173",
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173"
-    ];
+                     ??
+                     [
+                         "http://localhost:3000",
+                         "https://localhost:3000",
+                         "http://localhost:5173",
+                         "https://localhost:5173",
+                         "http://127.0.0.1:3000",
+                         "http://127.0.0.1:5173"
+                     ];
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+var useDistributedRateLimiting = !string.IsNullOrWhiteSpace(redisConnectionString);
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    var configuredProxies = builder.Configuration
+        .GetSection("ForwardedHeaders:KnownProxies")
+        .Get<string[]>() ?? Array.Empty<string>();
+
+    var trustedProxies = builder.Environment.IsDevelopment()
+        ? configuredProxies.Append("127.0.0.1").Append("::1")
+        : configuredProxies;
+
+    foreach (var proxy in trustedProxies.Distinct(StringComparer.OrdinalIgnoreCase))
+    {
+        if (IPAddress.TryParse(proxy, out var address))
+        {
+            options.KnownProxies.Add(address);
+        }
+    }
+});
+
+static string ResolveClientIp(HttpContext httpContext) =>
+    httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous-client";
 
 builder.Services.AddCors(options =>
 {
@@ -49,24 +77,13 @@ builder.Services.AddCors(options =>
     {
         if (builder.Environment.IsDevelopment())
         {
-            policy.SetIsOriginAllowed(_ => true)
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials();
+            policy.SetIsOriginAllowed(_ => true).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
         }
         else
         {
-            policy.WithOrigins(allowedOrigins)
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials();
+            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
         }
     });
-});
-
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 });
 
 builder.Services.AddRateLimiter(options =>
@@ -76,7 +93,6 @@ builder.Services.AddRateLimiter(options =>
     {
         context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         context.HttpContext.Response.ContentType = "application/problem+json";
-
         var problemDetails = new ProblemDetails
         {
             Status = StatusCodes.Status429TooManyRequests,
@@ -84,7 +100,6 @@ builder.Services.AddRateLimiter(options =>
             Detail = "Rate limit exceeded. Please try again later.",
             Type = "https://tools.ietf.org/html/rfc6585#section-4"
         };
-
         if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
         {
             var seconds = (int)Math.Max(1, Math.Ceiling(retryAfter.TotalSeconds));
@@ -92,75 +107,53 @@ builder.Services.AddRateLimiter(options =>
             problemDetails.Extensions["retryAfterSeconds"] = seconds;
         }
 
-        await context.HttpContext.Response.WriteAsJsonAsync(
-            problemDetails,
-            options: null,
-            contentType: "application/problem+json",
-            cancellationToken: cancellationToken);
+        await context.HttpContext.Response.WriteAsJsonAsync(problemDetails, options: null,
+            contentType: "application/problem+json", cancellationToken: cancellationToken);
     };
 
-    static string ResolveClientIp(HttpContext httpContext)
-    {
-        return httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous-client";
-    }
+    options.GlobalLimiter = useDistributedRateLimiting
+        ? PartitionedRateLimiter.Create<HttpContext, string>(_ =>
+            RateLimitPartition.GetNoLimiter("distributed"))
+        : PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+            RateLimitPartition.GetSlidingWindowLimiter(ResolveClientIp(httpContext), _ =>
+                new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 100, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 4, QueueLimit = 0
+                }));
 
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-    {
-        var clientIp = ResolveClientIp(httpContext);
-
-        return RateLimitPartition.GetSlidingWindowLimiter(
-            partitionKey: clientIp,
-            factory: _ => new SlidingWindowRateLimiterOptions
-            {
-                PermitLimit = 100,
-                Window = TimeSpan.FromMinutes(1),
-                SegmentsPerWindow = 4,
-                QueueLimit = 0
-            });
-    });
-
-    options.AddPolicy(RateLimitPolicies.AuthStrict, httpContext =>
-    {
-        var clientIp = ResolveClientIp(httpContext);
-
-        return RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: clientIp,
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            });
-    });
-
-    options.AddPolicy(RateLimitPolicies.MediaUpload, httpContext =>
-    {
-        var clientIp = ResolveClientIp(httpContext);
-
-        return RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: clientIp,
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            });
-    });
-
-    options.AddPolicy(RateLimitPolicies.ReservationStrict, httpContext =>
-    {
-        var clientIp = ResolveClientIp(httpContext);
-
-        return RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: clientIp,
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 10,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            });
-    });
+    AddFixedPolicy(options, RateLimitPolicies.AuthStrict, 5, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
+    AddFixedPolicy(options, RateLimitPolicies.Session, 20, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
+    AddSlidingPolicy(options, RateLimitPolicies.PublicRead, 60, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
+    AddFixedPolicy(options, RateLimitPolicies.MediaUpload, 5, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
+    AddFixedPolicy(options, RateLimitPolicies.ReservationStrict, 10, TimeSpan.FromMinutes(1),
+        useDistributedRateLimiting);
+    AddFixedPolicy(options, RateLimitPolicies.TicketQr, 20, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
+    AddFixedPolicy(options, RateLimitPolicies.TicketCheckIn, 30, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
+    AddSlidingPolicy(options, RateLimitPolicies.OrganizerRead, 60, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
+    AddSlidingPolicy(options, RateLimitPolicies.AdminRead, 120, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
+    AddFixedPolicy(options, RateLimitPolicies.Webhook, 100, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
 });
+
+static void AddFixedPolicy(Microsoft.AspNetCore.RateLimiting.RateLimiterOptions options, string policyName,
+    int permitLimit, TimeSpan window, bool distributed) =>
+    options.AddPolicy(policyName, httpContext =>
+        distributed
+            ? RateLimitPartition.GetNoLimiter("distributed")
+            : RateLimitPartition.GetFixedWindowLimiter(
+                httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous-client", _ =>
+                    new FixedWindowRateLimiterOptions { PermitLimit = permitLimit, Window = window, QueueLimit = 0 }));
+
+static void AddSlidingPolicy(Microsoft.AspNetCore.RateLimiting.RateLimiterOptions options, string policyName,
+    int permitLimit, TimeSpan window, bool distributed) =>
+    options.AddPolicy(policyName, httpContext =>
+        distributed
+            ? RateLimitPartition.GetNoLimiter("distributed")
+            : RateLimitPartition.GetSlidingWindowLimiter(
+                httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous-client", _ =>
+                    new SlidingWindowRateLimiterOptions
+                    {
+                        PermitLimit = permitLimit, Window = window, SegmentsPerWindow = 4, QueueLimit = 0
+                    }));
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -174,10 +167,10 @@ builder.Services.Configure<StripeOptions>(
 builder.Services.AddOptions<EmailOptions>()
     .Bind(builder.Configuration.GetSection(EmailOptions.SectionName))
     .Validate(options =>
-        Uri.TryCreate(options.VerificationUrl, UriKind.Absolute, out var uri) &&
-        (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) &&
-        Uri.TryCreate(options.PasswordResetUrl, UriKind.Absolute, out var resetUri) &&
-        (resetUri.Scheme == Uri.UriSchemeHttp || resetUri.Scheme == Uri.UriSchemeHttps),
+            Uri.TryCreate(options.VerificationUrl, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) &&
+            Uri.TryCreate(options.PasswordResetUrl, UriKind.Absolute, out var resetUri) &&
+            (resetUri.Scheme == Uri.UriSchemeHttp || resetUri.Scheme == Uri.UriSchemeHttps),
         "EmailSettings:VerificationUrl and PasswordResetUrl must be absolute HTTP or HTTPS URLs.")
     .ValidateDataAnnotations()
     .ValidateOnStart();
@@ -200,6 +193,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 builder.Services.AddHttpContextAccessor();
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+    {
+        var options = ConfigurationOptions.Parse(redisConnectionString);
+        options.AbortOnConnectFail = false;
+        return ConnectionMultiplexer.Connect(options);
+    });
+}
+
+builder.Services.AddSingleton<FailedLoginAttemptTracker>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddSingleton<IJwtProvider, JwtProvider>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
@@ -231,11 +235,13 @@ else
 {
     builder.Services.AddScoped<IPaymentGateway, DevelopmentPaymentGateway>();
 }
+
 builder.Services.AddHostedService<OutboxProcessorBackgroundService>();
 builder.Services.AddHostedService<EventStatusBackgroundService>();
 builder.Services.AddHostedService<ReservationExpirationBackgroundService>();
 
-builder.Services.AddMediatR(cfg => {
+builder.Services.AddMediatR(cfg =>
+{
     cfg.RegisterServicesFromAssembly(typeof(CreateEventCommand).Assembly);
     cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
 });
@@ -287,12 +293,14 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseForwardedHeaders();
 app.UseHttpsRedirection();
 app.UseCors(FrontendCorsPolicy);
-app.UseForwardedHeaders();
-app.UseRateLimiter();
+app.UseRouting();
 app.UseStaticFiles();
 app.UseAuthentication();
+app.UseMiddleware<DistributedRateLimitMiddleware>();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();

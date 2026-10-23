@@ -73,6 +73,7 @@ public sealed class PaymentsController : ControllerBase
 
     [HttpPost("webhook/stripe")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Webhook)]
     [IgnoreAntiforgeryToken]
     [RequestSizeLimit(1_048_576)]
     public async Task<IActionResult> StripeWebhook(CancellationToken cancellationToken)

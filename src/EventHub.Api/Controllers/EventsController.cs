@@ -24,6 +24,7 @@ namespace EventHub.Api.Controllers
     public class EventsController : ControllerBase
     {
         private readonly ISender _sender;
+
         public EventsController(ISender sender)
         {
             _sender = sender;
@@ -31,7 +32,9 @@ namespace EventHub.Api.Controllers
 
         [HttpGet]
         [AllowAnonymous]
-        public async Task<IActionResult> GetEvents([FromQuery] GetEventsQuery query, CancellationToken cancellationToken)
+        [EnableRateLimiting(RateLimitPolicies.PublicRead)]
+        public async Task<IActionResult> GetEvents([FromQuery] GetEventsQuery query,
+            CancellationToken cancellationToken)
         {
             var result = await _sender.Send(query, cancellationToken);
             return Ok(result);
@@ -39,7 +42,8 @@ namespace EventHub.Api.Controllers
 
         [HttpGet("my-events")]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
-        public async Task<IActionResult> GetMyEvents([FromQuery] GetOrganizerEventsQuery query, CancellationToken cancellationToken)
+        public async Task<IActionResult> GetMyEvents([FromQuery] GetOrganizerEventsQuery query,
+            CancellationToken cancellationToken)
         {
             var result = await _sender.Send(query, cancellationToken);
             return Ok(result);
@@ -47,7 +51,8 @@ namespace EventHub.Api.Controllers
 
         [HttpPost]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
-        public async Task<IActionResult> CreateEvent([FromBody] CreateEventCommand command, CancellationToken cancellationToken)
+        public async Task<IActionResult> CreateEvent([FromBody] CreateEventCommand command,
+            CancellationToken cancellationToken)
         {
             var eventId = await _sender.Send(command, cancellationToken);
             return CreatedAtAction(nameof(GetEventById), new { id = eventId }, eventId);
@@ -55,6 +60,7 @@ namespace EventHub.Api.Controllers
 
         [HttpGet("{id}")]
         [AllowAnonymous]
+        [EnableRateLimiting(RateLimitPolicies.PublicRead)]
         public async Task<IActionResult> GetEventById(Guid id, CancellationToken cancellationToken)
         {
             var query = new GetEventByIdQuery(id);
@@ -64,7 +70,8 @@ namespace EventHub.Api.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
-        public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] UpdateEventCommand command, CancellationToken cancellationToken)
+        public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] UpdateEventCommand command,
+            CancellationToken cancellationToken)
         {
             await _sender.Send(command with { Id = id }, cancellationToken);
             return NoContent();
@@ -72,15 +79,18 @@ namespace EventHub.Api.Controllers
 
         [HttpPatch("{id}/status")]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
-        public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateEventStatusRequest request, CancellationToken cancellationToken)
+        public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateEventStatusRequest request,
+            CancellationToken cancellationToken)
         {
-            await _sender.Send(new UpdateEventStatusCommand(id, request.Status, request.RejectionReason), cancellationToken);
+            await _sender.Send(new UpdateEventStatusCommand(id, request.Status, request.RejectionReason),
+                cancellationToken);
             return NoContent();
         }
 
         [HttpPut("{id}/ticket-types")]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
-        public async Task<IActionResult> UpdateTicketTypes(Guid id, [FromBody] List<UpdateTicketTypeDto> ticketTypes, CancellationToken cancellationToken)
+        public async Task<IActionResult> UpdateTicketTypes(Guid id, [FromBody] List<UpdateTicketTypeDto> ticketTypes,
+            CancellationToken cancellationToken)
         {
             await _sender.Send(new UpdateEventTicketTypesCommand(id, ticketTypes), cancellationToken);
             return NoContent();
@@ -90,7 +100,8 @@ namespace EventHub.Api.Controllers
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
         [EnableRateLimiting(RateLimitPolicies.MediaUpload)]
         [Consumes("multipart/form-data")]
-        public async Task<IActionResult> UploadPoster([FromRoute] Guid id, IFormFile? file, CancellationToken cancellationToken)
+        public async Task<IActionResult> UploadPoster([FromRoute] Guid id, IFormFile? file,
+            CancellationToken cancellationToken)
         {
             if (file is null || file.Length == 0)
             {

@@ -17,6 +17,21 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: eventhub-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - eventhub-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   dataprotection-init:
     image: mcr.microsoft.com/dotnet/aspnet:10.0
     user: root
@@ -35,12 +50,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       dataprotection-init:
         condition: service_completed_successfully
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_HTTP_PORTS: 8080
       Database__ApplyMigrations: ${DATABASE_APPLY_MIGRATIONS:-true}
+      ConnectionStrings__Redis: ${REDIS_CONNECTION:-redis:6379}
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:-EventHubDb};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
       Jwt__Issuer: ${JWT_ISSUER:-EventHubApi}
       Jwt__Audience: ${JWT_AUDIENCE:-EventHubClient}
@@ -65,5 +83,6 @@ services:
 
 volumes:
   eventhub-postgres-data:
+  eventhub-redis-data:
   eventhub-dataprotection-keys:
   eventhub-media-data:

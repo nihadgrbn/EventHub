@@ -3,9 +3,11 @@ using EventHub.Application.Tickets.Commands.CheckInTicket;
 using EventHub.Application.Tickets.Queries.GetTicketQr;
 using EventHub.Application.Tickets.Queries.GetMyTickets;
 using EventHub.Domain.Constants;
+using EventHub.Api.Constants;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using QRCoder;
 
 namespace EventHub.Api.Controllers;
@@ -21,18 +23,20 @@ public sealed class TicketsController : ControllerBase
     {
         _sender = sender;
     }
+
     [HttpGet("my-tickets")]
     [Authorize(Roles = Roles.Attendee)]
     public async Task<IActionResult> GetMyTickets(CancellationToken cancellationToken)
     {
         var query = new GetMyTicketsQuery();
-        var result = await _sender.Send(query,cancellationToken);
+        var result = await _sender.Send(query, cancellationToken);
 
         return Ok(result);
     }
 
     [HttpGet("{ticketId}/qr")]
     [Authorize(Roles = Roles.Attendee)]
+    [EnableRateLimiting(RateLimitPolicies.TicketQr)]
     public async Task<IActionResult> GetQrCode(Guid ticketId, CancellationToken cancellationToken)
     {
         var result = await _sender.Send(new GetTicketQrQuery(ticketId), cancellationToken);
@@ -44,7 +48,9 @@ public sealed class TicketsController : ControllerBase
 
     [HttpPost("check-in")]
     [Authorize(Roles = Roles.OrganizerOrAdmin)]
-    public async Task<IActionResult> CheckIn([FromBody] CheckInTicketCommand command, CancellationToken cancellationToken)
+    [EnableRateLimiting(RateLimitPolicies.TicketCheckIn)]
+    public async Task<IActionResult> CheckIn([FromBody] CheckInTicketCommand command,
+        CancellationToken cancellationToken)
     {
         await _sender.Send(command, cancellationToken);
         return NoContent();
