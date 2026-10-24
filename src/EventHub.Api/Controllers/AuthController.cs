@@ -73,7 +73,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
-    [EnableRateLimiting(RateLimitPolicies.AuthStrict)]
+    [EnableRateLimiting(RateLimitPolicies.Session)]
     public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand command)
     {
         var response = await _sender.Send(command);

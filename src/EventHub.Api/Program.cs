@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Text;
@@ -201,8 +202,26 @@ if (!string.IsNullOrWhiteSpace(redisConnectionString))
         options.AbortOnConnectFail = false;
         return ConnectionMultiplexer.Connect(options);
     });
+
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnectionString;
+        options.InstanceName = "eventhub:";
+    });
 }
 
+#pragma warning disable EXTEXP0018
+builder.Services.AddHybridCache(options =>
+{
+    options.DefaultEntryOptions = new HybridCacheEntryOptions
+    {
+        Expiration = TimeSpan.FromMinutes(5),
+        LocalCacheExpiration = TimeSpan.FromMinutes(5)
+    };
+});
+#pragma warning restore EXTEXP0018
+
+builder.Services.AddSingleton<ICacheService, HybridCacheService>();
 builder.Services.AddSingleton<FailedLoginAttemptTracker>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddSingleton<IJwtProvider, JwtProvider>();
@@ -244,6 +263,7 @@ builder.Services.AddMediatR(cfg =>
 {
     cfg.RegisterServicesFromAssembly(typeof(CreateEventCommand).Assembly);
     cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+    cfg.AddOpenBehavior(typeof(CacheInvalidationBehavior<,>));
 });
 builder.Services.AddValidatorsFromAssembly(typeof(CreateEventCommand).Assembly);
 builder.Services.AddControllers().AddJsonOptions(options =>
