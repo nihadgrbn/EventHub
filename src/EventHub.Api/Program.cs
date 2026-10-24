@@ -157,7 +157,23 @@ static void AddSlidingPolicy(Microsoft.AspNetCore.RateLimiting.RateLimiterOption
                     }));
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        npgsqlOptions =>
+        {
+            npgsqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(5),
+                errorCodesToAdd: null);
+        }));
+
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>(
+        name: "database",
+        tags: ["ready"])
+    .AddCheck<RedisHealthCheck>(
+        name: "redis",
+        tags: ["ready"]);
 
 builder.Services.Configure<JwtOptions>(
     builder.Configuration.GetSection("Jwt"));
@@ -323,6 +339,39 @@ app.UseMiddleware<DistributedRateLimitMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 app.MapControllers();
+
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false
+});
+
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var response = new
+        {
+            status = report.Status.ToString(),
+            duration = Math.Round(report.TotalDuration.TotalMilliseconds, 2),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration = Math.Round(e.Value.Duration.TotalMilliseconds, 2)
+            })
+        };
+        await context.Response.WriteAsJsonAsync(response);
+    }
+});
+
+app.MapHealthChecks("/healthz", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => true
+});
+
 app.Run();
 
 public partial class Program;

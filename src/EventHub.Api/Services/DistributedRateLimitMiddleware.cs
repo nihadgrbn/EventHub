@@ -65,7 +65,7 @@ public sealed class DistributedRateLimitMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (_database is null)
+        if (_database is null || context.Request.Path.StartsWithSegments("/health"))
         {
             await _next(context);
             return;
