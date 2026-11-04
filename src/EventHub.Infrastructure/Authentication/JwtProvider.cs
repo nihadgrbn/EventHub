@@ -24,6 +24,7 @@ public class JwtProvider : IJwtProvider
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(ClaimTypes.Role, user.Role)
         };
 
@@ -49,6 +50,8 @@ public class JwtProvider : IJwtProvider
 
     public string HashRefreshToken(string refreshToken)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(refreshToken);
+
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(refreshToken));
         return Convert.ToHexString(hash);
     }

@@ -13,6 +13,7 @@ public sealed class CancelReservationCommandHandler : IRequestHandler<CancelRese
     private readonly ITicketTypeRepository _ticketTypes;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPaymentGateway _paymentGateway;
+    private readonly ICacheService? _cacheService;
 
     public CancelReservationCommandHandler(
         ICurrentUserService currentUser,
@@ -20,7 +21,8 @@ public sealed class CancelReservationCommandHandler : IRequestHandler<CancelRese
         IPaymentRepository payments,
         ITicketTypeRepository ticketTypes,
         IUnitOfWork unitOfWork,
-        IPaymentGateway paymentGateway)
+        IPaymentGateway paymentGateway,
+        ICacheService? cacheService = null)
     {
         _currentUser = currentUser;
         _reservations = reservations;
@@ -28,6 +30,7 @@ public sealed class CancelReservationCommandHandler : IRequestHandler<CancelRese
         _ticketTypes = ticketTypes;
         _unitOfWork = unitOfWork;
         _paymentGateway = paymentGateway;
+        _cacheService = cacheService;
     }
 
     public async Task Handle(CancelReservationCommand request, CancellationToken cancellationToken)
@@ -81,5 +84,11 @@ public sealed class CancelReservationCommandHandler : IRequestHandler<CancelRese
                 transactionCancellationToken);
             await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
         }, cancellationToken);
+
+        if (_cacheService is not null)
+        {
+            await _cacheService.RemoveByTagAsync($"event:{reservation.EventId}", cancellationToken);
+            await _cacheService.RemoveByTagAsync("events", cancellationToken);
+        }
     }
 }

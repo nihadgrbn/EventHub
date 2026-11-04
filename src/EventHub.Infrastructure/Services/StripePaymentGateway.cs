@@ -115,6 +115,14 @@ public sealed class StripePaymentGateway : IPaymentGateway
                 cancellationToken: cancellationToken);
         }
         catch (StripeException exception)
+            when (exception.StripeError?.Message?.Contains("open", StringComparison.OrdinalIgnoreCase) == true
+                  || exception.Message.Contains("open", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation(
+                "Stripe checkout session {CheckoutSessionId} was already expired or closed when attempting manual expiration.",
+                checkoutSessionId);
+        }
+        catch (StripeException exception)
         {
             throw new PaymentProviderException(
                 $"Stripe checkout could not be cancelled: {exception.StripeError?.Message ?? "The provider rejected the request."}");

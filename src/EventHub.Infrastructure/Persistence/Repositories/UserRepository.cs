@@ -20,7 +20,10 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken)
     {
-        return await _context.Users.SingleOrDefaultAsync(u => u.Email == email, cancellationToken);
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        return await _context.Users.SingleOrDefaultAsync(
+            u => u.Email.ToLower() == normalizedEmail,
+            cancellationToken);
     }
 
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
@@ -30,7 +33,10 @@ public class UserRepository : IUserRepository
 
     public async Task<bool> IsEmailUniqueAsync(string email, CancellationToken cancellationToken)
     {
-        return !await _context.Users.AnyAsync(u => u.Email == email, cancellationToken);
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        return !await _context.Users.AnyAsync(
+            u => u.Email.ToLower() == normalizedEmail,
+            cancellationToken);
     }
 
     public async Task<User?> GetByRefreshTokenHashAsync(

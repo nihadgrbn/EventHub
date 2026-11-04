@@ -42,6 +42,7 @@ namespace EventHub.Api.Controllers
 
         [HttpGet("my-events")]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        [EnableRateLimiting(RateLimitPolicies.OrganizerRead)]
         public async Task<IActionResult> GetMyEvents([FromQuery] GetOrganizerEventsQuery query,
             CancellationToken cancellationToken)
         {
@@ -51,6 +52,7 @@ namespace EventHub.Api.Controllers
 
         [HttpPost]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        [EnableRateLimiting(RateLimitPolicies.OrganizerWrite)]
         public async Task<IActionResult> CreateEvent([FromBody] CreateEventCommand command,
             CancellationToken cancellationToken)
         {
@@ -70,6 +72,7 @@ namespace EventHub.Api.Controllers
 
         [HttpPut("{id}")]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        [EnableRateLimiting(RateLimitPolicies.OrganizerWrite)]
         public async Task<IActionResult> UpdateEvent(Guid id, [FromBody] UpdateEventCommand command,
             CancellationToken cancellationToken)
         {
@@ -79,6 +82,7 @@ namespace EventHub.Api.Controllers
 
         [HttpPatch("{id}/status")]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        [EnableRateLimiting(RateLimitPolicies.OrganizerWrite)]
         public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateEventStatusRequest request,
             CancellationToken cancellationToken)
         {
@@ -89,6 +93,7 @@ namespace EventHub.Api.Controllers
 
         [HttpPut("{id}/ticket-types")]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        [EnableRateLimiting(RateLimitPolicies.OrganizerWrite)]
         public async Task<IActionResult> UpdateTicketTypes(Guid id, [FromBody] List<UpdateTicketTypeDto> ticketTypes,
             CancellationToken cancellationToken)
         {
@@ -100,6 +105,7 @@ namespace EventHub.Api.Controllers
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
         [EnableRateLimiting(RateLimitPolicies.MediaUpload)]
         [Consumes("multipart/form-data")]
+        [RequestSizeLimit(5 * 1024 * 1024 + 65_536)]
         public async Task<IActionResult> UploadPoster([FromRoute] Guid id, IFormFile? file,
             CancellationToken cancellationToken)
         {
@@ -131,6 +137,7 @@ namespace EventHub.Api.Controllers
 
         [HttpDelete("{id}")]
         [Authorize(Roles = Roles.OrganizerOrAdmin)]
+        [EnableRateLimiting(RateLimitPolicies.OrganizerWrite)]
         public async Task<IActionResult> DeleteEvent(Guid id, CancellationToken cancellationToken)
         {
             await _sender.Send(new DeleteEventCommand(id), cancellationToken);

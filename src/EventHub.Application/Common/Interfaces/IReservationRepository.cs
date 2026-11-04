@@ -24,6 +24,10 @@ public interface IReservationRepository
         Guid paymentId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyDictionary<Guid, int>> GetActiveQuantitiesByTicketTypeIdsAsync(
+        IReadOnlyCollection<Guid> ticketTypeIds,
+        CancellationToken cancellationToken);
+
     Task<bool> TryConfirmAsync(
         Guid reservationId,
         DateTime confirmedAt,

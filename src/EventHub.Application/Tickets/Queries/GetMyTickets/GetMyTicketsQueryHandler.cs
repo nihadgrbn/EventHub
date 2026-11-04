@@ -29,12 +29,16 @@ namespace EventHub.Application.Tickets.Queries.GetMyTickets
 
             return tickets.Select(t => new MyTicketResponseDto(
                 t.Id,
+                t.EventId,
                 t.Event!.Title,
                 t.Event.Date,
                 t.Event.Location,
-                t.TicketType!.Name,
-                t.TicketType.Price,
-                t.PurchaseDate
+                t.Event.Status.ToString(),
+                !string.IsNullOrWhiteSpace(t.TicketTypeNameAtPurchase) ? t.TicketTypeNameAtPurchase : t.TicketType!.Name,
+                t.PriceAtPurchase > 0m || t.TicketType is null ? t.PriceAtPurchase : t.TicketType.Price,
+                t.PurchaseDate,
+                t.Status.ToString(),
+                t.CheckedInAt
             ));
         }
     }

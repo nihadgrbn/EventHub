@@ -6,22 +6,21 @@ public sealed class CreateReservationCommandValidator : AbstractValidator<Create
 {
     public CreateReservationCommandValidator()
     {
-        RuleFor(command => command.EventId)
-            .NotEmpty().WithMessage("Event ID cannot be empty.");
-
-        RuleFor(command => command.TicketTypeId)
-            .NotEmpty().WithMessage("Ticket type ID cannot be empty.");
-
-        RuleFor(command => command.Quantity)
-            .InclusiveBetween(1, 10)
-            .WithMessage("Quantity must be between 1 and 10.");
-
-        RuleFor(command => command.IdempotencyKey)
-            .Cascade(CascadeMode.Stop)
+        RuleFor(x => x.EventId)
             .NotEmpty()
-            .WithMessage("Idempotency key is required.")
-            .Must(value => value is not null && value == value.Trim())
-            .WithMessage("Idempotency key cannot start or end with whitespace.")
-            .MaximumLength(100);
+            .WithMessage("EventId is required.");
+
+        RuleFor(x => x.TicketTypeId)
+            .NotEmpty()
+            .WithMessage("TicketTypeId is required.");
+
+        RuleFor(x => x.Quantity)
+            .InclusiveBetween(1, 20)
+            .WithMessage("Quantity must be between 1 and 20 tickets per reservation.");
+
+        RuleFor(x => x.IdempotencyKey)
+            .MaximumLength(100)
+            .When(x => !string.IsNullOrWhiteSpace(x.IdempotencyKey))
+            .WithMessage("IdempotencyKey cannot exceed 100 characters.");
     }
 }

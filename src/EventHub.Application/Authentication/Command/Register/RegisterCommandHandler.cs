@@ -1,3 +1,4 @@
+using System.Net;
 using EventHub.Application.Authentication.Command.Register;
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
@@ -34,7 +35,8 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand>
 
     public async Task Handle(RegisterCommand request, CancellationToken cancellationToken)
     {
-        if (!await _userRepository.IsEmailUniqueAsync(request.Email, cancellationToken))
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        if (!await _userRepository.IsEmailUniqueAsync(normalizedEmail, cancellationToken))
         {
             throw new ConflictException("This email is already registered.");
         }
@@ -44,20 +46,20 @@ public class RegisterCommandHandler : IRequestHandler<RegisterCommand>
 
         var user = new User
         {
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            Email = request.Email,
+            FirstName = request.FirstName.Trim(),
+            LastName = request.LastName.Trim(),
+            Email = normalizedEmail,
             PasswordHash = hashedPassword,
             Role = Roles.Normalize(request.Role),
             EmailVerificationTokenHash = _secureTokenService.HashToken(verificationToken),
             EmailVerificationTokenExpires = _secureTokenService.GetEmailVerificationTokenExpiry()
         };
 
+        var verificationLink = _verificationLinkBuilder.Build(verificationToken);
+        var emailBody = $"<h2>Verify your email</h2><p>Hello {WebUtility.HtmlEncode(user.FirstName)},</p><p><a href=\"{verificationLink}\">Verify email</a></p><p>This link expires in 24 hours.</p>";
+        await _emailService.SendEmailAsync(user.Email, "EventHub email verification", emailBody, cancellationToken: cancellationToken);
+
         await _userRepository.AddAsync(user, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        var verificationLink = _verificationLinkBuilder.Build(verificationToken);
-        var emailBody = $"<h2>Verify your email</h2><p>Hello {System.Net.WebUtility.HtmlEncode(user.FirstName)},</p><p><a href=\"{verificationLink}\">Verify email</a></p><p>This link expires in 24 hours.</p>";
-        await _emailService.SendEmailAsync(user.Email, "EventHub email verification", emailBody);
     }
 }

@@ -1,8 +1,10 @@
+using System.Net;
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Domain.Constants;
 using EventHub.Domain.Enums;
 using MediatR;
+using Microsoft.Extensions.Logging;
 
 namespace EventHub.Application.Events.Commands.UpdateEventStatus;
 
@@ -12,17 +14,20 @@ public sealed class UpdateEventStatusCommandHandler : IRequestHandler<UpdateEven
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
     private readonly IEmailService _emailService;
+    private readonly ILogger<UpdateEventStatusCommandHandler>? _logger;
 
     public UpdateEventStatusCommandHandler(
         IEventRepository eventRepository,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUserService,
-        IEmailService emailService)
+        IEmailService emailService,
+        ILogger<UpdateEventStatusCommandHandler>? logger = null)
     {
         _eventRepository = eventRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
         _emailService = emailService;
+        _logger = logger;
     }
 
     public async Task Handle(UpdateEventStatusCommand request, CancellationToken cancellationToken)
@@ -56,7 +61,7 @@ public sealed class UpdateEventStatusCommandHandler : IRequestHandler<UpdateEven
                 {
                     throw new ConflictException("Tədbir imtina edilərkən səbəb (rejection reason) mütləq daxil edilməlidir.");
                 }
-                @event.RejectionReason = request.RejectionReason;
+                @event.RejectionReason = request.RejectionReason.Trim();
             }
             else
             {
@@ -77,30 +82,35 @@ public sealed class UpdateEventStatusCommandHandler : IRequestHandler<UpdateEven
         {
             try
             {
+                var encodedFirstName = WebUtility.HtmlEncode(@event.Organizer.FirstName);
+                var encodedTitle = WebUtility.HtmlEncode(@event.Title);
+                var encodedLocation = WebUtility.HtmlEncode(@event.Location);
+
                 if (request.Status == EventStatus.Published)
                 {
                     var subject = "🎉 EventHub: Tədbiriniz təsdiqləndi!";
                     var body = $@"
                         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;'>
-                            <h2 style='color: #10b981;'>Təbrik edirik, {@event.Organizer.FirstName}!</h2>
-                            <p style='font-size: 16px; color: #334155;'>Sizin yaratmış olduğunuz <strong>""{@event.Title}""</strong> adlı tədbir inzibatçılarımız tərəfindən nəzərdən keçirildi və uğurla təsdiqləndi!</p>
+                            <h2 style='color: #10b981;'>Təbrik edirik, {encodedFirstName}!</h2>
+                            <p style='font-size: 16px; color: #334155;'>Sizin yaratmış olduğunuz <strong>&quot;{encodedTitle}&quot;</strong> adlı tədbir inzibatçılarımız tərəfindən nəzərdən keçirildi və uğurla təsdiqləndi!</p>
                             <p style='font-size: 16px; color: #334155;'>Tədbiriniz artıq rəsmi olaraq platformamızda dərc olunub və bilet satışı aktivdir.</p>
                             <hr style='border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;' />
-                            <p style='font-size: 14px; color: #64748b;'>Tədbir Tarixi: {@event.Date.ToString("dd.MM.yyyy HH:mm")}<br />Məkan: {@event.Location}</p>
+                            <p style='font-size: 14px; color: #64748b;'>Tədbir Tarixi: {@event.Date:dd.MM.yyyy HH:mm}<br />Məkan: {encodedLocation}</p>
                         </div>";
 
                     await _emailService.SendEmailAsync(@event.Organizer.Email, subject, body, true, null, cancellationToken);
                 }
                 else if (request.Status == EventStatus.Draft && isAdmin && !string.IsNullOrWhiteSpace(request.RejectionReason))
                 {
+                    var encodedRejectionReason = WebUtility.HtmlEncode(request.RejectionReason.Trim());
                     var subject = "⚠️ EventHub: Tədbir müraciətiniz rədd edildi";
                     var body = $@"
                         <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;'>
-                            <h2 style='color: #ef4444;'>Salam, {@event.Organizer.FirstName}!</h2>
-                            <p style='font-size: 16px; color: #334155;'>Sizin təqdim etdiyiniz <strong>""{@event.Title}""</strong> adlı tədbir inzibatçılarımız tərəfindən nəzərdən keçirildi, lakin bəzi səbəblərdən təsdiqlənmədi.</p>
+                            <h2 style='color: #ef4444;'>Salam, {encodedFirstName}!</h2>
+                            <p style='font-size: 16px; color: #334155;'>Sizin təqdim etdiyiniz <strong>&quot;{encodedTitle}&quot;</strong> adlı tədbir inzibatçılarımız tərəfindən nəzərdən keçirildi, lakin bəzi səbəblərdən təsdiqlənmədi.</p>
                             <div style='background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px;'>
                                 <strong style='color: #991b1b;'>İmtina Səbəbi:</strong>
-                                <p style='margin: 5px 0 0 0; color: #7f1d1d;'>{request.RejectionReason}</p>
+                                <p style='margin: 5px 0 0 0; color: #7f1d1d;'>{encodedRejectionReason}</p>
                             </div>
                             <p style='font-size: 16px; color: #334155;'>Zəhmət olmasa yuxarıdakı qeydləri nəzərə alaraq tədbirinizi yeniləyin və yenidən təsdiqə göndərin.</p>
                         </div>";
@@ -108,8 +118,13 @@ public sealed class UpdateEventStatusCommandHandler : IRequestHandler<UpdateEven
                     await _emailService.SendEmailAsync(@event.Organizer.Email, subject, body, true, null, cancellationToken);
                 }
             }
-            catch
+            catch (Exception exception)
             {
+                _logger?.LogWarning(
+                    exception,
+                    "Failed to send status notification email for event {EventId} (Status={Status}).",
+                    @event.Id,
+                    request.Status);
             }
         }
     }
@@ -121,6 +136,11 @@ public sealed class UpdateEventStatusCommandHandler : IRequestHandler<UpdateEven
             throw new ConflictException("The event already has this status.");
         }
 
+        if (current == EventStatus.Published && target == EventStatus.Cancelled)
+        {
+            throw new ConflictException("Published events cannot be cancelled.");
+        }
+
         var isValid = (current, target) switch
         {
             (EventStatus.Draft, EventStatus.PendingReview) when eventDate > DateTime.UtcNow => true,
@@ -130,8 +150,6 @@ public sealed class UpdateEventStatusCommandHandler : IRequestHandler<UpdateEven
             (EventStatus.PendingReview, EventStatus.Draft) => true,
 
             (EventStatus.Draft, EventStatus.Cancelled) => true,
-
-            (EventStatus.Published, EventStatus.Cancelled) when eventDate > DateTime.UtcNow => true,
 
             _ => false
         };

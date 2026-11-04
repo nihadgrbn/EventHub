@@ -69,20 +69,25 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     }
 });
 
-static string ResolveClientIp(HttpContext httpContext) =>
-    httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous-client";
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(FrontendCorsPolicy, policy =>
     {
         if (builder.Environment.IsDevelopment())
         {
-            policy.SetIsOriginAllowed(_ => true).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+            policy.SetIsOriginAllowed(_ => true)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials()
+                .WithExposedHeaders("X-Qr-Token", "Retry-After");
         }
         else
         {
-            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+            policy.WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials()
+                .WithExposedHeaders("X-Qr-Token", "Retry-After");
         }
     });
 });
@@ -116,8 +121,9 @@ builder.Services.AddRateLimiter(options =>
         ? PartitionedRateLimiter.Create<HttpContext, string>(_ =>
             RateLimitPartition.GetNoLimiter("distributed"))
         : PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
-            RateLimitPartition.GetSlidingWindowLimiter(ResolveClientIp(httpContext), _ =>
-                new SlidingWindowRateLimiterOptions
+            RateLimitPartition.GetSlidingWindowLimiter(
+                RateLimitPartitionKeyBuilder.Build("global", httpContext),
+                _ => new SlidingWindowRateLimiterOptions
                 {
                     PermitLimit = 100, Window = TimeSpan.FromMinutes(1), SegmentsPerWindow = 4, QueueLimit = 0
                 }));
@@ -131,6 +137,7 @@ builder.Services.AddRateLimiter(options =>
     AddFixedPolicy(options, RateLimitPolicies.TicketQr, 20, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
     AddFixedPolicy(options, RateLimitPolicies.TicketCheckIn, 30, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
     AddSlidingPolicy(options, RateLimitPolicies.OrganizerRead, 60, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
+    AddFixedPolicy(options, RateLimitPolicies.OrganizerWrite, 30, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
     AddSlidingPolicy(options, RateLimitPolicies.AdminRead, 120, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
     AddFixedPolicy(options, RateLimitPolicies.Webhook, 100, TimeSpan.FromMinutes(1), useDistributedRateLimiting);
 });
@@ -141,7 +148,7 @@ static void AddFixedPolicy(Microsoft.AspNetCore.RateLimiting.RateLimiterOptions 
         distributed
             ? RateLimitPartition.GetNoLimiter("distributed")
             : RateLimitPartition.GetFixedWindowLimiter(
-                httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous-client", _ =>
+                RateLimitPartitionKeyBuilder.Build(policyName, httpContext), _ =>
                     new FixedWindowRateLimiterOptions { PermitLimit = permitLimit, Window = window, QueueLimit = 0 }));
 
 static void AddSlidingPolicy(Microsoft.AspNetCore.RateLimiting.RateLimiterOptions options, string policyName,
@@ -150,7 +157,7 @@ static void AddSlidingPolicy(Microsoft.AspNetCore.RateLimiting.RateLimiterOption
         distributed
             ? RateLimitPartition.GetNoLimiter("distributed")
             : RateLimitPartition.GetSlidingWindowLimiter(
-                httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous-client", _ =>
+                RateLimitPartitionKeyBuilder.Build(policyName, httpContext), _ =>
                     new SlidingWindowRateLimiterOptions
                     {
                         PermitLimit = permitLimit, Window = window, SegmentsPerWindow = 4, QueueLimit = 0
@@ -175,8 +182,15 @@ builder.Services.AddHealthChecks()
         name: "redis",
         tags: ["ready"]);
 
-builder.Services.Configure<JwtOptions>(
-    builder.Configuration.GetSection("Jwt"));
+builder.Services.AddOptions<JwtOptions>()
+    .Bind(builder.Configuration.GetSection("Jwt"))
+    .Validate(options =>
+            !string.IsNullOrWhiteSpace(options.Issuer) &&
+            !string.IsNullOrWhiteSpace(options.Audience) &&
+            !string.IsNullOrWhiteSpace(options.SecretKey) &&
+            Encoding.UTF8.GetByteCount(options.SecretKey) >= 32,
+        "Jwt:Issuer, Jwt:Audience, and a Jwt:SecretKey of at least 32 bytes are required.")
+    .ValidateOnStart();
 builder.Services.Configure<TokenOptions>(
     builder.Configuration.GetSection("TokenOptions"));
 builder.Services.Configure<StripeOptions>(
@@ -192,6 +206,13 @@ builder.Services.AddOptions<EmailOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+var jwtSecretKey = builder.Configuration["Jwt:SecretKey"];
+if (string.IsNullOrWhiteSpace(jwtSecretKey) || Encoding.UTF8.GetByteCount(jwtSecretKey) < 32)
+{
+    throw new InvalidOperationException(
+        "Jwt:SecretKey must be configured and contain at least 32 bytes.");
+}
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -201,10 +222,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"]!))
+                Encoding.UTF8.GetBytes(jwtSecretKey))
         };
     });
 
@@ -232,7 +254,9 @@ builder.Services.AddHybridCache(options =>
     options.DefaultEntryOptions = new HybridCacheEntryOptions
     {
         Expiration = TimeSpan.FromMinutes(5),
-        LocalCacheExpiration = TimeSpan.FromMinutes(5)
+        LocalCacheExpiration = useDistributedRateLimiting
+            ? TimeSpan.FromSeconds(30)
+            : TimeSpan.FromMinutes(5)
     };
 });
 #pragma warning restore EXTEXP0018
@@ -328,6 +352,19 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    app.UseHsts();
+}
+
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
+    context.Response.Headers.TryAdd("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.TryAdd("X-Permitted-Cross-Domain-Policies", "none");
+    await next();
+});
 
 app.UseForwardedHeaders();
 app.UseHttpsRedirection();

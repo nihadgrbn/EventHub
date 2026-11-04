@@ -40,8 +40,7 @@ public sealed class PaymentRepository : IPaymentRepository
     {
         return await _context.Payments
             .Where(payment => payment.Id == paymentId
-                && payment.Status == PaymentStatus.Pending
-                && payment.ExpiresAt > paidAt)
+                && payment.Status == PaymentStatus.Pending)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(payment => payment.Status, PaymentStatus.Paid)
                 .SetProperty(payment => payment.PaidAt, paidAt)
@@ -59,6 +58,7 @@ public sealed class PaymentRepository : IPaymentRepository
                 && payment.ExpiresAt <= expiredAt)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(payment => payment.Status, PaymentStatus.Expired)
+                .SetProperty(payment => payment.IdempotencyKey, (string?)null)
                 .SetProperty(payment => payment.UpdatedAt, expiredAt), cancellationToken) == 1;
     }
 
@@ -105,6 +105,7 @@ public sealed class PaymentRepository : IPaymentRepository
                 && payment.Status == PaymentStatus.Pending)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(payment => payment.Status, PaymentStatus.Failed)
+                .SetProperty(payment => payment.IdempotencyKey, (string?)null)
                 .SetProperty(payment => payment.UpdatedAt, failedAt), cancellationToken) == 1;
     }
 
@@ -118,6 +119,7 @@ public sealed class PaymentRepository : IPaymentRepository
                 && payment.Status == PaymentStatus.Pending)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(payment => payment.Status, PaymentStatus.Expired)
+                .SetProperty(payment => payment.IdempotencyKey, (string?)null)
                 .SetProperty(payment => payment.UpdatedAt, expiredAt), cancellationToken) == 1;
     }
 
@@ -131,6 +133,7 @@ public sealed class PaymentRepository : IPaymentRepository
                 && payment.Status == PaymentStatus.Pending)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(payment => payment.Status, PaymentStatus.Failed)
+                .SetProperty(payment => payment.IdempotencyKey, (string?)null)
                 .SetProperty(payment => payment.UpdatedAt, failedAt), cancellationToken) == 1;
     }
 

@@ -10,6 +10,7 @@ public sealed class CreateReservationCommandHandler
     : IRequestHandler<CreateReservationCommand, CreateReservationResult>
 {
     private static readonly TimeSpan ReservationDuration = TimeSpan.FromMinutes(31);
+    private const int MaxQuantityPerReservation = 20;
 
     private readonly ITicketTypeRepository _ticketTypes;
     private readonly IEventRepository _events;
@@ -44,9 +45,9 @@ public sealed class CreateReservationCommandHandler
         var attendeeId = _currentUser.UserId
             ?? throw new UnauthorizedException("You must be logged in to reserve tickets.");
 
-        if (request.Quantity <= 0)
+        if (request.Quantity <= 0 || request.Quantity > MaxQuantityPerReservation)
         {
-            throw new ConflictException("Quantity must be greater than zero.");
+            throw new ConflictException($"Quantity must be between 1 and {MaxQuantityPerReservation}.");
         }
 
         var idempotencyKey = request.IdempotencyKey?.Trim();
@@ -118,6 +119,11 @@ public sealed class CreateReservationCommandHandler
             throw new ConflictException("The ticket type does not belong to the selected event.");
         }
 
+        if (ticketType.Price <= 0m)
+        {
+            throw new ConflictException("Ticket price must be greater than zero.");
+        }
+
         var eventEntity = await _events.GetByIdAsync(request.EventId, cancellationToken)
             ?? throw new NotFoundException("Event not found.");
 
@@ -126,7 +132,13 @@ public sealed class CreateReservationCommandHandler
             throw new ConflictException("Tickets can only be reserved for published events.");
         }
 
-        var expiresAt = DateTime.UtcNow.Add(ReservationDuration);
+        var now = DateTime.UtcNow;
+        if (eventEntity.Date != default && eventEntity.Date <= now)
+        {
+            throw new ConflictException("Tickets cannot be reserved for an event that has already started or ended.");
+        }
+
+        var expiresAt = now.Add(ReservationDuration);
         var payment = new Payment
         {
             AttendeeId = attendeeId,
@@ -163,13 +175,22 @@ public sealed class CreateReservationCommandHandler
             await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
         }, cancellationToken);
 
-        var checkoutSession = await CreateCheckoutSessionAsync(
-            payment.Id,
-            reservation,
-            payment.Amount,
-            payment.Currency,
-            payment.ExpiresAt,
-            cancellationToken);
+        PaymentCheckoutSession checkoutSession;
+        try
+        {
+            checkoutSession = await CreateCheckoutSessionAsync(
+                payment.Id,
+                reservation,
+                payment.Amount,
+                payment.Currency,
+                payment.ExpiresAt,
+                cancellationToken);
+        }
+        catch
+        {
+            await ReleaseFailedReservationInventoryAsync(payment.Id, reservation);
+            throw;
+        }
 
         return new CreateReservationResult(
             payment.Id,
@@ -205,5 +226,33 @@ public sealed class CreateReservationCommandHandler
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return checkoutSession;
+    }
+
+    private async Task ReleaseFailedReservationInventoryAsync(Guid paymentId, Reservation reservation)
+    {
+        try
+        {
+            var releasedAt = DateTime.UtcNow;
+            await _unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
+            {
+                if (await _payments.TryMarkAsFailedAsync(paymentId, releasedAt, transactionCancellationToken))
+                {
+                    await _ticketTypes.TryIncreaseAvailableQuantityAsync(
+                        reservation.TicketTypeId,
+                        reservation.Quantity,
+                        transactionCancellationToken);
+                    await _reservations.UpdateStatusAsync(
+                        reservation.Id,
+                        ReservationStatus.Cancelled,
+                        releasedAt,
+                        transactionCancellationToken);
+                    await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
+                }
+            }, CancellationToken.None);
+        }
+        catch
+        {
+            // If compensating release fails, ReservationExpirationBackgroundService will still recover inventory.
+        }
     }
 }

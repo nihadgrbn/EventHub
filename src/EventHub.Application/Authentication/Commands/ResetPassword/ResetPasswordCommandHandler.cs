@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
 using MediatR;
@@ -25,13 +27,18 @@ public sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswordC
 
     public async Task Handle(ResetPasswordCommand request, CancellationToken cancellationToken)
     {
-        var email = request.Email.Trim();
+        var email = request.Email.Trim().ToLowerInvariant();
         var token = request.Token.Trim();
         var user = await _users.GetByEmailAsync(email, cancellationToken);
         var tokenHash = _tokens.HashToken(token);
 
-        if (user is null || user.PasswordResetTokenHash != tokenHash ||
-            user.PasswordResetTokenExpires is null || user.PasswordResetTokenExpires <= DateTime.UtcNow)
+        if (user is null
+            || string.IsNullOrWhiteSpace(user.PasswordResetTokenHash)
+            || !CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(user.PasswordResetTokenHash),
+                Encoding.UTF8.GetBytes(tokenHash))
+            || user.PasswordResetTokenExpires is null
+            || user.PasswordResetTokenExpires <= DateTime.UtcNow)
         {
             throw new UnauthorizedException("The reset link is invalid or expired.");
         }

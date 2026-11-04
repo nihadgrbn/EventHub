@@ -114,6 +114,41 @@ public sealed class CreateReservationCommandHandlerTests
             It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    [Fact]
+    public async Task Handle_WhenCheckoutSessionCreationFails_ReleasesInventoryAndMarksFailed()
+    {
+        var attendeeId = Guid.NewGuid();
+        var eventId = Guid.NewGuid();
+        var ticketTypeId = Guid.NewGuid();
+
+        ConfigureUser(attendeeId);
+        ConfigureTicket(eventId, ticketTypeId, 25m);
+        _ticketTypes.Setup(repository => repository.TryDecreaseAvailableQuantityAsync(
+                ticketTypeId, 2, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _payments.Setup(repository => repository.TryMarkAsFailedAsync(
+                It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        ConfigureTransaction();
+
+        var handler = CreateHandler();
+        _paymentGateway.Setup(gateway => gateway.CreateCheckoutSessionAsync(
+                It.IsAny<PaymentCheckoutRequest>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("Stripe API unavailable"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
+            new CreateReservationCommand(eventId, ticketTypeId, 2, "checkout-fail"),
+            CancellationToken.None));
+
+        _payments.Verify(repository => repository.TryMarkAsFailedAsync(
+            It.IsAny<Guid>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        _ticketTypes.Verify(repository => repository.TryIncreaseAvailableQuantityAsync(
+            ticketTypeId, 2, It.IsAny<CancellationToken>()), Times.Once);
+        _reservations.Verify(repository => repository.UpdateStatusAsync(
+            It.IsAny<Guid>(), ReservationStatus.Cancelled, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
     private void ConfigureUser(Guid attendeeId)
     {
         _currentUser.SetupGet(service => service.UserId).Returns(attendeeId);

@@ -54,6 +54,27 @@ public sealed class UpdateEventStatusCommandHandlerTests
             CreateHandler().Handle(new UpdateEventStatusCommand(@event.Id, EventStatus.Published), CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Handle_PublishedEvent_CannotBeCancelled()
+    {
+        var organizerId = Guid.NewGuid();
+        var @event = new Event
+        {
+            OrganizerId = organizerId,
+            Date = DateTime.UtcNow.AddDays(5),
+            Status = EventStatus.Published
+        };
+        _events.Setup(repository => repository.GetByIdAsync(@event.Id, It.IsAny<CancellationToken>())).ReturnsAsync(@event);
+        _currentUser.SetupGet(service => service.UserId).Returns(organizerId);
+        _currentUser.Setup(service => service.IsInRole(Roles.Admin)).Returns(true);
+
+        var exception = await Assert.ThrowsAsync<ConflictException>(() =>
+            CreateHandler().Handle(new UpdateEventStatusCommand(@event.Id, EventStatus.Cancelled), CancellationToken.None));
+
+        Assert.Equal("Published events cannot be cancelled.", exception.Message);
+        _unitOfWork.Verify(unit => unit.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
     private UpdateEventStatusCommandHandler CreateHandler() => new(
         _events.Object,
         _unitOfWork.Object,

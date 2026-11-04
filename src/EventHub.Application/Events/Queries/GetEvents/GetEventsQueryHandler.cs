@@ -1,11 +1,6 @@
 ﻿using EventHub.Application.Common.Interfaces;
 using EventHub.Application.Common.Models;
 using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace EventHub.Application.Events.Queries.GetEvents
 {
@@ -22,20 +17,25 @@ namespace EventHub.Application.Events.Queries.GetEvents
 
         public async Task<PaginatedList<EventResponse>> Handle(GetEventsQuery request, CancellationToken cancellationToken)
         {
-            var cacheKey = $"events:catalog:{request.SearchTerm}:{request.Location}:{request.Category}:{request.DateFrom:yyyyMMdd}:{request.DateTo:yyyyMMdd}:{request.SortBy}:{request.SortOrder}:{request.PageNumber}:{request.PageSize}";
+            var normalizedSearch = request.SearchTerm?.Trim().ToLowerInvariant() ?? string.Empty;
+            var normalizedLocation = request.Location?.Trim().ToLowerInvariant() ?? string.Empty;
+            var normalizedSortBy = request.SortBy?.Trim().ToLowerInvariant() ?? "date";
+            var normalizedSortOrder = request.SortOrder?.Trim().ToLowerInvariant() ?? "asc";
+
+            var cacheKey = $"events:catalog:{normalizedSearch}:{normalizedLocation}:{request.Category}:{request.DateFrom:yyyyMMdd}:{request.DateTo:yyyyMMdd}:{normalizedSortBy}:{normalizedSortOrder}:{request.PageNumber}:{request.PageSize}";
 
             return await _cacheService.GetOrCreateAsync(
                 cacheKey,
                 async token =>
                 {
                     var (events, totalCount) = await _eventRepository.GetPagedEventsAsync(
-                        request.SearchTerm,
-                        request.Location,
+                        request.SearchTerm?.Trim(),
+                        request.Location?.Trim(),
                         request.Category,
                         request.DateFrom,
                         request.DateTo,
-                        request.SortBy,
-                        request.SortOrder,
+                        normalizedSortBy,
+                        normalizedSortOrder,
                         request.PageNumber,
                         request.PageSize,
                         token);

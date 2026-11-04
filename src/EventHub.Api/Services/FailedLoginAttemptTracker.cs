@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace EventHub.Api.Services;
@@ -13,19 +14,76 @@ public sealed class FailedLoginAttemptTracker
 
     private readonly ConcurrentDictionary<string, FailureState> _states = new(StringComparer.Ordinal);
     private readonly IDatabase? _database;
+    private readonly ILogger<FailedLoginAttemptTracker>? _logger;
 
-    public FailedLoginAttemptTracker(IConnectionMultiplexer? redis = null)
+    public FailedLoginAttemptTracker(
+        IConnectionMultiplexer? redis = null,
+        ILogger<FailedLoginAttemptTracker>? logger = null)
     {
         _database = redis?.GetDatabase();
+        _logger = logger;
     }
 
     public bool TryGetRetryAfter(string ipAddress, string email, out TimeSpan retryAfter)
     {
         if (_database is not null)
         {
-            return TryGetRedisRetryAfter(ipAddress, email, out retryAfter);
+            try
+            {
+                return TryGetRedisRetryAfter(ipAddress, email, out retryAfter);
+            }
+            catch (RedisException exception)
+            {
+                _logger?.LogError(
+                    exception,
+                    "Redis failed-login check failed; falling back to in-memory state.");
+            }
         }
 
+        return TryGetInMemoryRetryAfter(ipAddress, email, out retryAfter);
+    }
+
+    public TimeSpan RecordFailure(string ipAddress, string email)
+    {
+        if (_database is not null)
+        {
+            try
+            {
+                return RecordRedisFailure(ipAddress, email);
+            }
+            catch (RedisException exception)
+            {
+                _logger?.LogError(
+                    exception,
+                    "Redis failed-login recording failed; falling back to in-memory state.");
+            }
+        }
+
+        return RecordInMemoryFailure(ipAddress, email);
+    }
+
+    public void RecordSuccess(string ipAddress, string email)
+    {
+        var accountIpKey = GetAccountIpKey(ipAddress, email);
+        _states.TryRemove(accountIpKey, out _);
+
+        if (_database is not null)
+        {
+            try
+            {
+                _database.KeyDelete(GetRedisKey(accountIpKey));
+            }
+            catch (RedisException exception)
+            {
+                _logger?.LogError(
+                    exception,
+                    "Redis failed-login reset failed; in-memory state was cleared.");
+            }
+        }
+    }
+
+    private bool TryGetInMemoryRetryAfter(string ipAddress, string email, out TimeSpan retryAfter)
+    {
         var now = DateTimeOffset.UtcNow;
         var accountIpBlocked = TryGetBlockedUntil(GetAccountIpKey(ipAddress, email), now, out var accountIpUntil);
         var ipBlocked = TryGetBlockedUntil(GetIpKey(ipAddress), now, out var ipUntil);
@@ -41,29 +99,13 @@ public sealed class FailedLoginAttemptTracker
         return true;
     }
 
-    public TimeSpan RecordFailure(string ipAddress, string email)
+    private TimeSpan RecordInMemoryFailure(string ipAddress, string email)
     {
-        if (_database is not null)
-        {
-            return RecordRedisFailure(ipAddress, email);
-        }
-
         var now = DateTimeOffset.UtcNow;
         var accountIpUntil = RegisterFailure(GetAccountIpKey(ipAddress, email), AccountIpFailureThreshold, now);
         var ipUntil = RegisterFailure(GetIpKey(ipAddress), IpFailureThreshold, now);
         var blockedUntil = accountIpUntil > ipUntil ? accountIpUntil : ipUntil;
         return blockedUntil > now ? blockedUntil - now : TimeSpan.Zero;
-    }
-
-    public void RecordSuccess(string ipAddress, string email)
-    {
-        if (_database is not null)
-        {
-            _database.KeyDelete(GetRedisKey(GetAccountIpKey(ipAddress, email)));
-            return;
-        }
-
-        _states.TryRemove(GetAccountIpKey(ipAddress, email), out _);
     }
 
     private bool TryGetRedisRetryAfter(string ipAddress, string email, out TimeSpan retryAfter)

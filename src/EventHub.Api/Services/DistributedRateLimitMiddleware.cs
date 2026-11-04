@@ -18,6 +18,7 @@ public sealed class DistributedRateLimitMiddleware
             ["ticket-qr"] = 20,
             ["ticket-check-in"] = 30,
             ["organizer-read"] = 60,
+            ["organizer-write"] = 30,
             ["admin-read"] = 120,
             ["webhook"] = 100
         };

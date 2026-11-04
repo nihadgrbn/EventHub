@@ -19,14 +19,14 @@ public sealed class AdminReadRepository : IAdminReadRepository
         string? search, string? role, int pageNumber, int pageSize, CancellationToken cancellationToken)
     {
         var query = _context.Users.AsNoTracking();
-        var normalizedSearch = search?.Trim();
+        var normalizedSearch = search?.Trim().ToLower();
         var normalizedRole = role?.Trim();
 
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
-            query = query.Where(user => user.FirstName.Contains(normalizedSearch)
-                || user.LastName.Contains(normalizedSearch)
-                || user.Email.Contains(normalizedSearch));
+            query = query.Where(user => user.FirstName.ToLower().Contains(normalizedSearch)
+                || user.LastName.ToLower().Contains(normalizedSearch)
+                || user.Email.ToLower().Contains(normalizedSearch));
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedRole))
@@ -51,14 +51,14 @@ public sealed class AdminReadRepository : IAdminReadRepository
         string? search, string? status, Guid? organizerId, int pageNumber, int pageSize, CancellationToken cancellationToken)
     {
         var query = _context.Events.AsNoTracking();
-        var normalizedSearch = search?.Trim();
+        var normalizedSearch = search?.Trim().ToLower();
         var normalizedStatus = status?.Trim();
 
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
-            query = query.Where(@event => @event.Title.Contains(normalizedSearch)
-                || @event.Description.Contains(normalizedSearch)
-                || @event.Location.Contains(normalizedSearch));
+            query = query.Where(@event => @event.Title.ToLower().Contains(normalizedSearch)
+                || @event.Description.ToLower().Contains(normalizedSearch)
+                || @event.Location.ToLower().Contains(normalizedSearch));
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedStatus))

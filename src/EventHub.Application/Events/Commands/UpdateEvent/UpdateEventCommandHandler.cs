@@ -11,15 +11,18 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand>
     private readonly IEventRepository _eventRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IFileStorageService? _fileStorageService;
 
     public UpdateEventCommandHandler(
         IEventRepository eventRepository,
         IUnitOfWork unitOfWork,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IFileStorageService? fileStorageService = null)
     {
         _eventRepository = eventRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _fileStorageService = fileStorageService;
     }
 
     public async Task Handle(UpdateEventCommand request, CancellationToken cancellationToken)
@@ -45,15 +48,24 @@ public class UpdateEventCommandHandler : IRequestHandler<UpdateEventCommand>
             throw new ConflictException("Cancelled or completed events cannot be edited.");
         }
 
-        @event.Title = request.Title;
+        var normalizedPosterUrl = request.PosterImageUrl?.Trim();
+        if (_fileStorageService is not null
+            && !string.IsNullOrWhiteSpace(@event.PosterImageUrl)
+            && !string.Equals(@event.PosterImageUrl, normalizedPosterUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            await _fileStorageService.DeleteFileAsync(@event.PosterImageUrl, cancellationToken);
+        }
+
+        @event.Title = request.Title.Trim();
         @event.Description = request.Description;
         @event.Date = request.Date;
-        @event.Location = request.Location;
+        @event.Location = request.Location.Trim();
         @event.Category = request.Category;
         @event.Address = request.Address.Trim();
-        @event.PosterImageUrl = request.PosterImageUrl?.Trim();
+        @event.PosterImageUrl = normalizedPosterUrl;
         @event.Latitude = request.Latitude;
         @event.Longitude = request.Longitude;
+        @event.UpdatedAt = DateTime.UtcNow;
 
         _eventRepository.Update(@event);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

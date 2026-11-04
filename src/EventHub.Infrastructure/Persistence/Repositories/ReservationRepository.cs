@@ -52,8 +52,7 @@ public sealed class ReservationRepository : IReservationRepository
     {
         return await _context.Reservations
             .Where(reservation => reservation.Id == reservationId
-                && reservation.Status == ReservationStatus.Active
-                && reservation.ReservedUntil > confirmedAt)
+                && reservation.Status == ReservationStatus.Active)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(reservation => reservation.Status, ReservationStatus.Confirmed)
                 .SetProperty(reservation => reservation.ConfirmedAt, confirmedAt)
@@ -78,6 +77,26 @@ public sealed class ReservationRepository : IReservationRepository
             .SingleOrDefaultAsync(
                 reservation => reservation.PaymentId == paymentId
                     && reservation.Status == ReservationStatus.Active,
+                cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, int>> GetActiveQuantitiesByTicketTypeIdsAsync(
+        IReadOnlyCollection<Guid> ticketTypeIds,
+        CancellationToken cancellationToken)
+    {
+        if (ticketTypeIds.Count == 0)
+        {
+            return new Dictionary<Guid, int>();
+        }
+
+        return await _context.Reservations
+            .AsNoTracking()
+            .Where(reservation => ticketTypeIds.Contains(reservation.TicketTypeId)
+                && reservation.Status == ReservationStatus.Active)
+            .GroupBy(reservation => reservation.TicketTypeId)
+            .ToDictionaryAsync(
+                group => group.Key,
+                group => group.Sum(reservation => reservation.Quantity),
                 cancellationToken);
     }
 

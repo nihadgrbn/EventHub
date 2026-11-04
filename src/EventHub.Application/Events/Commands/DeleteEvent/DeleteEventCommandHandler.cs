@@ -12,19 +12,22 @@ public class DeleteEventCommandHandler : IRequestHandler<DeleteEventCommand>
     private readonly ICurrentUserService _currentUserService;
     private readonly ITicketRepository _ticketRepository;
     private readonly IFileStorageService _fileStorageService;
+    private readonly IReservationRepository? _reservationRepository;
 
     public DeleteEventCommandHandler(
         IEventRepository eventRepository,
         IUnitOfWork unitOfWork,
         ICurrentUserService currentUserService,
         ITicketRepository ticketRepository,
-        IFileStorageService fileStorageService)
+        IFileStorageService fileStorageService,
+        IReservationRepository? reservationRepository = null)
     {
         _eventRepository = eventRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
         _ticketRepository = ticketRepository;
         _fileStorageService = fileStorageService;
+        _reservationRepository = reservationRepository;
     }
 
     public async Task Handle(DeleteEventCommand request, CancellationToken cancellationToken)
@@ -47,15 +50,26 @@ public class DeleteEventCommandHandler : IRequestHandler<DeleteEventCommand>
 
         if (@event.Status != EventHub.Domain.Enums.EventStatus.Draft)
         {
-            throw new ConflictException("Only draft events can be deleted. Cancel a published event instead.");
+            throw new ConflictException("Only draft events can be deleted. Published events cannot be deleted or cancelled.");
         }
 
+        var ticketTypeIds = @event.TicketTypes.Select(ticketType => ticketType.Id).ToArray();
         var salesByTicketTypeId = await _ticketRepository.GetCountsByTicketTypeIdsAsync(
-            @event.TicketTypes.Select(ticketType => ticketType.Id).ToArray(), cancellationToken);
+            ticketTypeIds, cancellationToken);
 
         if (salesByTicketTypeId.Values.Sum() > 0)
         {
             throw new ConflictException("An event with sold tickets cannot be deleted.");
+        }
+
+        if (_reservationRepository is not null)
+        {
+            var activeReservations = await _reservationRepository.GetActiveQuantitiesByTicketTypeIdsAsync(
+                ticketTypeIds, cancellationToken);
+            if (activeReservations.Values.Sum() > 0)
+            {
+                throw new ConflictException("An event with active reservations cannot be deleted.");
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(@event.PosterImageUrl))

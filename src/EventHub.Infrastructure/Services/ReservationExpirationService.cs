@@ -11,19 +11,22 @@ public sealed class ReservationExpirationService : IReservationExpirationService
     private readonly ITicketTypeRepository _ticketTypes;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<ReservationExpirationService> _logger;
+    private readonly ICacheService? _cacheService;
 
     public ReservationExpirationService(
         IReservationRepository reservations,
         IPaymentRepository payments,
         ITicketTypeRepository ticketTypes,
         IUnitOfWork unitOfWork,
-        ILogger<ReservationExpirationService> logger)
+        ILogger<ReservationExpirationService> logger,
+        ICacheService? cacheService = null)
     {
         _reservations = reservations;
         _payments = payments;
         _ticketTypes = ticketTypes;
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _cacheService = cacheService;
     }
 
     public async Task<int> ExpireReservationsAsync(
@@ -34,6 +37,7 @@ public sealed class ReservationExpirationService : IReservationExpirationService
             utcNow,
             cancellationToken);
         var expiredCount = 0;
+        var affectedEventIds = new HashSet<Guid>();
 
         foreach (var reservation in expiredReservations)
         {
@@ -70,6 +74,10 @@ public sealed class ReservationExpirationService : IReservationExpirationService
                 }, cancellationToken);
 
                 expiredCount++;
+                if (reservation.EventId != Guid.Empty)
+                {
+                    affectedEventIds.Add(reservation.EventId);
+                }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -82,6 +90,16 @@ public sealed class ReservationExpirationService : IReservationExpirationService
                     "Failed to expire reservation {ReservationId}.",
                     reservation.Id);
             }
+        }
+
+        if (expiredCount > 0 && _cacheService is not null)
+        {
+            foreach (var eventId in affectedEventIds)
+            {
+                await _cacheService.RemoveByTagAsync($"event:{eventId}", cancellationToken);
+            }
+
+            await _cacheService.RemoveByTagAsync("events", cancellationToken);
         }
 
         return expiredCount;

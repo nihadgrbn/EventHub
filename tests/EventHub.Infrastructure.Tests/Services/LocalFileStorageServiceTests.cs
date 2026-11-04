@@ -82,7 +82,7 @@ public sealed class LocalFileStorageServiceTests : IDisposable
         {
             0x52, 0x49, 0x46, 0x46, // RIFF
             0x00, 0x00, 0x00, 0x00, // Size
-            0x57, 0x41, 0x42, 0x50  // WEBP
+            0x57, 0x45, 0x42, 0x50  // WEBP
         };
         using var stream = new MemoryStream(webpBytes);
 

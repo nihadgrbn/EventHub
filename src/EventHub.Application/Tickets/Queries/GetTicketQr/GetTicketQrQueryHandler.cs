@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using EventHub.Application.Common.Exceptions;
 using EventHub.Application.Common.Interfaces;
 using EventHub.Domain.Enums;
@@ -11,12 +9,18 @@ public sealed class GetTicketQrQueryHandler : IRequestHandler<GetTicketQrQuery, 
 {
     private readonly ITicketRepository _tickets;
     private readonly ICurrentUserService _currentUser;
+    private readonly ISecureTokenService _secureTokenService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public GetTicketQrQueryHandler(ITicketRepository tickets, ICurrentUserService currentUser, IUnitOfWork unitOfWork)
+    public GetTicketQrQueryHandler(
+        ITicketRepository tickets,
+        ICurrentUserService currentUser,
+        ISecureTokenService secureTokenService,
+        IUnitOfWork unitOfWork)
     {
         _tickets = tickets;
         _currentUser = currentUser;
+        _secureTokenService = secureTokenService;
         _unitOfWork = unitOfWork;
     }
 
@@ -35,9 +39,15 @@ public sealed class GetTicketQrQueryHandler : IRequestHandler<GetTicketQrQuery, 
         if (ticket.CheckedInAt.HasValue)
             throw new ConflictException("This ticket has already been checked in.");
 
-        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        ticket.QrTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        var token = _secureTokenService.GenerateTicketQrToken(ticket.Id);
+        var expectedHash = _secureTokenService.HashToken(token);
+
+        if (!string.Equals(ticket.QrTokenHash, expectedHash, StringComparison.Ordinal))
+        {
+            ticket.QrTokenHash = expectedHash;
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+
         return new TicketQrPayload(ticket.Id, token);
     }
 }

@@ -82,7 +82,7 @@ public sealed class TicketRepository : ITicketRepository
 
         return await _context.Tickets
             .AsNoTracking()
-            .Where(ticket => ticketTypeIds.Contains(ticket.TicketTypeId))
+            .Where(ticket => ticketTypeIds.Contains(ticket.TicketTypeId) && ticket.Status == TicketStatus.Active)
             .GroupBy(ticket => ticket.TicketTypeId)
             .ToDictionaryAsync(group => group.Key, group => group.Count(), cancellationToken);
     }
@@ -91,7 +91,11 @@ public sealed class TicketRepository : ITicketRepository
         await _context.Tickets.Include(ticket => ticket.Event).FirstOrDefaultAsync(ticket => ticket.Id == id, cancellationToken);
 
     public async Task<Ticket?> GetByQrTokenHashAsync(string qrTokenHash, CancellationToken cancellationToken) =>
-        await _context.Tickets.AsNoTracking().Include(ticket => ticket.Event)
+        await _context.Tickets
+            .AsNoTracking()
+            .Include(ticket => ticket.Event)
+            .Include(ticket => ticket.TicketType)
+            .Include(ticket => ticket.Attendee)
             .FirstOrDefaultAsync(ticket => ticket.QrTokenHash == qrTokenHash, cancellationToken);
 
     public async Task<bool> TryCheckInAsync(Guid eventId, string qrTokenHash, Guid checkedInById, DateTime checkedInAt, CancellationToken cancellationToken) =>

@@ -19,6 +19,7 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
     private readonly IOutboxRepository _outboxRepository;
     private readonly IUserRepository _userRepository;
     private readonly IEventRepository _eventRepository;
+    private readonly ISecureTokenService? _secureTokenService;
 
     public BuyTicketCommandHandler(
         ITicketTypeRepository ticketTypeRepository,
@@ -28,7 +29,8 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
         IPurchaseRepository purchaseRepository,
         IOutboxRepository outboxRepository,
         IUserRepository userRepository,
-        IEventRepository eventRepository)
+        IEventRepository eventRepository,
+        ISecureTokenService? secureTokenService = null)
     {
         _ticketTypeRepository = ticketTypeRepository;
         _ticketRepository = ticketRepository;
@@ -38,6 +40,7 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
         _outboxRepository = outboxRepository;
         _userRepository = userRepository;
         _eventRepository = eventRepository;
+        _secureTokenService = secureTokenService;
     }
 
     public async Task<IReadOnlyList<Guid>> Handle(
@@ -98,6 +101,10 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
         }
 
         var purchasedAt = DateTime.UtcNow;
+        if (eventEntity.Date != default && eventEntity.Date <= purchasedAt)
+        {
+            throw new ConflictException("Tickets cannot be purchased for an event that has already started or ended.");
+        }
 
         var purchaseId = Guid.NewGuid();
 
@@ -110,23 +117,32 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
             TotalAmount = ticketType.Price * request.Quantity
         };
 
-        var ticketTokens = Enumerable.Range(0, request.Quantity)
-            .Select(_ => Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
-            .ToList();
-        var tickets = ticketTokens.Select(token => new Ticket
-        {
-            Id = Guid.NewGuid(),
-            EventId = request.EventId,
-            TicketTypeId = request.TicketTypeId,
-            AttendeeId = attendeeId,
-            PurchaseId = purchase.Id,
-            Purchase = purchase,
-            PurchaseDate = purchasedAt,
-            TicketTypeNameAtPurchase = ticketType.Name,
-            PriceAtPurchase = ticketType.Price,
-            QrTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)))
-        }).ToList();
+        var ticketData = Enumerable.Range(0, request.Quantity)
+            .Select(_ =>
+            {
+                var ticketId = Guid.NewGuid();
+                var token = _secureTokenService?.GenerateTicketQrToken(ticketId)
+                            ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+                var hash = _secureTokenService?.HashToken(token)
+                           ?? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
+                return (Token: token, Ticket: new Ticket
+                {
+                    Id = ticketId,
+                    EventId = request.EventId,
+                    TicketTypeId = request.TicketTypeId,
+                    AttendeeId = attendeeId,
+                    PurchaseId = purchase.Id,
+                    Purchase = purchase,
+                    PurchaseDate = purchasedAt,
+                    TicketTypeNameAtPurchase = ticketType.Name,
+                    PriceAtPurchase = ticketType.Price,
+                    QrTokenHash = hash
+                });
+            })
+            .ToList();
+
+        var tickets = ticketData.Select(item => item.Ticket).ToList();
         purchase.Tickets = tickets;
 
         var receiptEvent = new PurchaseReceiptEvent(
@@ -135,11 +151,11 @@ public sealed class BuyTicketCommandHandler : IRequestHandler<BuyTicketCommand, 
             attendee.Email,
             eventEntity.Title,
             eventEntity.Date,
-            tickets.Zip(ticketTokens).Select(pair => new PurchaseReceiptItem(
-                pair.First.Id,
-                pair.First.TicketTypeNameAtPurchase,
-                pair.First.PriceAtPurchase,
-                pair.Second)).ToList(),
+            ticketData.Select(item => new PurchaseReceiptItem(
+                item.Ticket.Id,
+                item.Ticket.TicketTypeNameAtPurchase,
+                item.Ticket.PriceAtPurchase,
+                item.Token)).ToList(),
             purchase.TotalAmount);
 
         var outboxMessage = new OutboxMessage

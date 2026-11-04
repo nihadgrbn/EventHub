@@ -33,12 +33,15 @@ public class GetOrganizerOrdersQueryHandler : IRequestHandler<GetOrganizerOrders
 
         var orderDtos = tickets.Select(t => new OrganizerOrderDto(
             t.Id,
+            t.EventId,
             t.Event!.Title,
-            t.TicketType!.Name,
-            t.TicketType.Price,
+            !string.IsNullOrWhiteSpace(t.TicketTypeNameAtPurchase) ? t.TicketTypeNameAtPurchase : t.TicketType!.Name,
+            t.PriceAtPurchase > 0m || t.TicketType is null ? t.PriceAtPurchase : t.TicketType.Price,
             t.AttendeeId,
             t.Attendee != null ? $"{t.Attendee.FirstName} {t.Attendee.LastName}" : "Unknown Attendee",
-            t.PurchaseDate
+            t.PurchaseDate,
+            t.Status.ToString(),
+            t.CheckedInAt
         )).ToList();
 
         return new PaginatedList<OrganizerOrderDto>(orderDtos, totalCount, request.PageNumber, request.PageSize);

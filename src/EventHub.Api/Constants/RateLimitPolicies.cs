@@ -10,6 +10,7 @@ public static class RateLimitPolicies
     public const string TicketQr = "ticket-qr";
     public const string TicketCheckIn = "ticket-check-in";
     public const string OrganizerRead = "organizer-read";
+    public const string OrganizerWrite = "organizer-write";
     public const string AdminRead = "admin-read";
     public const string Webhook = "webhook";
 }

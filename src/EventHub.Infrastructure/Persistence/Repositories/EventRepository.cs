@@ -72,7 +72,7 @@ namespace EventHub.Infrastructure.Persistence.Repositories
 
             var ticketsQuery = _context.Tickets
                 .Include(t => t.TicketType)
-                .Where(t => organizerId == null || t.Event!.OrganizerId == organizerId);
+                .Where(t => t.Status == TicketStatus.Active && (organizerId == null || t.Event!.OrganizerId == organizerId));
 
             var totalTicketsSold = await ticketsQuery.CountAsync(cancellationToken);
 
@@ -102,31 +102,35 @@ namespace EventHub.Infrastructure.Persistence.Repositories
         }
 
         public async Task<(IEnumerable<Event> Events, int TotalCount)> GetPagedEventsAsync(
-    string? searchTerm,
-    string? location,
-    EventCategory? category,
-    DateTime? dateFrom,
-    DateTime? dateTo,
-    string? sortBy,
-    string? sortOrder,
-    int pageNumber,
-    int pageSize,
-    CancellationToken cancellationToken)
+            string? searchTerm,
+            string? location,
+            EventCategory? category,
+            DateTime? dateFrom,
+            DateTime? dateTo,
+            string? sortBy,
+            string? sortOrder,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken)
         {
             var query = _context.Events
                 .Include(e => e.Organizer)
                 .Include(e => e.TicketTypes)
-                .Where(e => e.Status == EventHub.Domain.Enums.EventStatus.Published)
+                .Where(e => e.Status == EventStatus.Published)
                 .AsNoTracking();
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
-                query = query.Where(e => e.Title.Contains(searchTerm) || e.Description.Contains(searchTerm));
+                var normalizedSearch = searchTerm.Trim().ToLower();
+                query = query.Where(e =>
+                    e.Title.ToLower().Contains(normalizedSearch) ||
+                    e.Description.ToLower().Contains(normalizedSearch));
             }
 
             if (!string.IsNullOrWhiteSpace(location))
             {
-                query = query.Where(e => e.Location.Contains(location));
+                var normalizedLocation = location.Trim().ToLower();
+                query = query.Where(e => e.Location.ToLower().Contains(normalizedLocation));
             }
 
             if (category.HasValue)

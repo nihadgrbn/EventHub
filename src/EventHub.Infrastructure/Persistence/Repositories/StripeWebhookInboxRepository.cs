@@ -77,6 +77,7 @@ public sealed class StripeWebhookInboxRepository : IStripeWebhookInboxRepository
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(item => item.Status, StripeWebhookInboxStatus.Processed)
                 .SetProperty(item => item.ProcessedAt, processedAt)
+                .SetProperty(item => item.ProcessingStartedAt, (DateTime?)null)
                 .SetProperty(item => item.LastError, (string?)null), cancellationToken);
     }
 
@@ -90,6 +91,7 @@ public sealed class StripeWebhookInboxRepository : IStripeWebhookInboxRepository
             .Where(item => item.EventId == eventId)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(item => item.Status, StripeWebhookInboxStatus.Failed)
+                .SetProperty(item => item.ProcessingStartedAt, (DateTime?)null)
                 .SetProperty(item => item.LastError, truncatedError), cancellationToken);
     }
 }

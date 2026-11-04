@@ -1,5 +1,6 @@
 using EventHub.Application.Admin.Models;
 using EventHub.Application.Common.Models;
+using FluentValidation;
 using MediatR;
 
 namespace EventHub.Application.Admin.Queries;
@@ -46,3 +47,68 @@ public sealed record GetAdminOutboxMessagesQuery(
     string? Status = null,
     int PageNumber = 1,
     int PageSize = 20) : IRequest<PaginatedList<AdminOutboxDto>>;
+
+public sealed class GetAdminUsersQueryValidator : AbstractValidator<GetAdminUsersQuery>
+{
+    public GetAdminUsersQueryValidator()
+    {
+        RuleFor(x => x.PageNumber).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+        RuleFor(x => x.Search).MaximumLength(150);
+    }
+}
+
+public sealed class GetAdminEventsQueryValidator : AbstractValidator<GetAdminEventsQuery>
+{
+    public GetAdminEventsQueryValidator()
+    {
+        RuleFor(x => x.PageNumber).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+        RuleFor(x => x.Search).MaximumLength(150);
+    }
+}
+
+public sealed class GetAdminPurchasesQueryValidator : AbstractValidator<GetAdminPurchasesQuery>
+{
+    public GetAdminPurchasesQueryValidator()
+    {
+        RuleFor(x => x.PageNumber).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+    }
+}
+
+public sealed class GetAdminPaymentsQueryValidator : AbstractValidator<GetAdminPaymentsQuery>
+{
+    public GetAdminPaymentsQueryValidator()
+    {
+        RuleFor(x => x.PageNumber).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+    }
+}
+
+public sealed class GetAdminReservationsQueryValidator : AbstractValidator<GetAdminReservationsQuery>
+{
+    public GetAdminReservationsQueryValidator()
+    {
+        RuleFor(x => x.PageNumber).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+    }
+}
+
+public sealed class GetAdminWebhooksQueryValidator : AbstractValidator<GetAdminWebhooksQuery>
+{
+    public GetAdminWebhooksQueryValidator()
+    {
+        RuleFor(x => x.PageNumber).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+    }
+}
+
+public sealed class GetAdminOutboxMessagesQueryValidator : AbstractValidator<GetAdminOutboxMessagesQuery>
+{
+    public GetAdminOutboxMessagesQueryValidator()
+    {
+        RuleFor(x => x.PageNumber).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+    }
+}

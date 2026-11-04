@@ -49,6 +49,12 @@ public sealed class EventStatusBackgroundService : BackgroundService
 
             if (completedCount > 0)
             {
+                var cacheService = scope.ServiceProvider.GetService<ICacheService>();
+                if (cacheService is not null)
+                {
+                    await cacheService.RemoveByTagAsync("events", cancellationToken);
+                }
+
                 _logger.LogInformation(
                     "{Count} event(s) automatically marked as Completed.",
                     completedCount);

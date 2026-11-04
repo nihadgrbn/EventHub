@@ -3,12 +3,12 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
-using MimeKit.Text;
 
 namespace EventHub.Infrastructure.Services;
 
 public class EmailService : IEmailService
 {
+    private const int DefaultSmtpTimeoutMs = 15_000;
     private readonly EmailOptions _options;
 
     public EmailService(IOptions<EmailOptions> options)
@@ -43,14 +43,18 @@ public class EmailService : IEmailService
         }
         email.Body = bodyBuilder.ToMessageBody();
 
-        using var smtp = new SmtpClient();
+        using var smtp = new SmtpClient
+        {
+            Timeout = DefaultSmtpTimeoutMs
+        };
 
         await smtp.ConnectAsync(
             _options.SmtpServer,
             _options.SmtpPort,
             _options.SmtpPort == 465
                 ? SecureSocketOptions.SslOnConnect
-                : SecureSocketOptions.StartTls);
+                : SecureSocketOptions.StartTls,
+            cancellationToken);
 
         await smtp.AuthenticateAsync(
             _options.SenderEmail,

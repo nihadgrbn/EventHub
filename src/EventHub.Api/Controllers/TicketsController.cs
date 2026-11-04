@@ -43,7 +43,27 @@ public sealed class TicketsController : ControllerBase
         using var generator = new QRCodeGenerator();
         using var data = generator.CreateQrCode(result.Payload, QRCodeGenerator.ECCLevel.Q);
         var png = new PngByteQRCode(data).GetGraphic(12);
+        Response.Headers["X-Qr-Token"] = result.Payload;
         return File(png, "image/png", $"ticket-{result.TicketId}.png");
+    }
+
+    [HttpGet("{ticketId}/qr-pass")]
+    [Authorize(Roles = Roles.Attendee)]
+    [EnableRateLimiting(RateLimitPolicies.TicketQr)]
+    public async Task<IActionResult> GetQrPass(Guid ticketId, CancellationToken cancellationToken)
+    {
+        var result = await _sender.Send(new GetTicketQrQuery(ticketId), cancellationToken);
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(result.Payload, QRCodeGenerator.ECCLevel.Q);
+        var png = new PngByteQRCode(data).GetGraphic(12);
+        var base64Image = $"data:image/png;base64,{Convert.ToBase64String(png)}";
+
+        return Ok(new
+        {
+            ticketId = result.TicketId,
+            qrToken = result.Payload,
+            qrImageUrl = base64Image
+        });
     }
 
     [HttpPost("check-in")]
@@ -52,7 +72,7 @@ public sealed class TicketsController : ControllerBase
     public async Task<IActionResult> CheckIn([FromBody] CheckInTicketCommand command,
         CancellationToken cancellationToken)
     {
-        await _sender.Send(command, cancellationToken);
-        return NoContent();
+        var result = await _sender.Send(command, cancellationToken);
+        return Ok(result);
     }
 }

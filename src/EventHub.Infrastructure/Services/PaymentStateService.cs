@@ -12,6 +12,7 @@ public sealed class PaymentStateService : IPaymentStateService
     private readonly ITicketRepository _tickets;
     private readonly IStripeEventRepository _stripeEvents;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService? _cacheService;
 
     public PaymentStateService(
         IPaymentRepository payments,
@@ -19,7 +20,8 @@ public sealed class PaymentStateService : IPaymentStateService
         ITicketTypeRepository ticketTypes,
         ITicketRepository tickets,
         IStripeEventRepository stripeEvents,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ICacheService? cacheService = null)
     {
         _payments = payments;
         _reservations = reservations;
@@ -27,6 +29,7 @@ public sealed class PaymentStateService : IPaymentStateService
         _tickets = tickets;
         _stripeEvents = stripeEvents;
         _unitOfWork = unitOfWork;
+        _cacheService = cacheService;
     }
 
     public Task HandleExpiredCheckoutAsync(
@@ -38,8 +41,8 @@ public sealed class PaymentStateService : IPaymentStateService
             cancellation => _payments.GetByCheckoutSessionIdAsync(
                 checkoutSessionId,
                 cancellation),
-            (payment, cancellation) => _payments.TryMarkAsExpiredAsync(
-                payment.Id,
+            (_, cancellation) => _payments.TryMarkAsExpiredByCheckoutSessionIdAsync(
+                checkoutSessionId,
                 occurredAt,
                 cancellation),
             ReservationStatus.Expired,
@@ -88,6 +91,8 @@ public sealed class PaymentStateService : IPaymentStateService
         DateTime occurredAt,
         CancellationToken cancellationToken)
     {
+        Guid? invalidatedEventId = null;
+
         await _unitOfWork.ExecuteInTransactionAsync(async transactionCancellationToken =>
         {
             if (!await _stripeEvents.TryMarkAsProcessedAsync(
@@ -132,7 +137,18 @@ public sealed class PaymentStateService : IPaymentStateService
                 occurredAt,
                 transactionCancellationToken);
             await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
+            invalidatedEventId = reservation.EventId;
         }, cancellationToken);
+
+        if (invalidatedEventId is { } eventId && _cacheService is not null)
+        {
+            if (eventId != Guid.Empty)
+            {
+                await _cacheService.RemoveByTagAsync($"event:{eventId}", cancellationToken);
+            }
+
+            await _cacheService.RemoveByTagAsync("events", cancellationToken);
+        }
     }
 
     private async Task RefundAsync(

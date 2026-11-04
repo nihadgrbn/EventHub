@@ -25,7 +25,8 @@ namespace EventHub.Application.Authentication.Queries.Login
 
         public async Task<AuthResponse> Handle(LoginQuery request, CancellationToken cancellationToken)
         {
-            var user = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var user = await _userRepository.GetByEmailAsync(normalizedEmail, cancellationToken);
 
             if (user is null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
             {

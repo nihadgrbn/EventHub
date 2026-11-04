@@ -21,6 +21,8 @@ public sealed class ConfirmReservationCommandHandler
     private readonly IOutboxRepository _outbox;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IStripeEventRepository _stripeEvents;
+    private readonly ISecureTokenService? _secureTokenService;
+    private readonly ICacheService? _cacheService;
 
     public ConfirmReservationCommandHandler(
         ICurrentUserService currentUser,
@@ -31,7 +33,9 @@ public sealed class ConfirmReservationCommandHandler
         IUserRepository users,
         IOutboxRepository outbox,
         IUnitOfWork unitOfWork,
-        IStripeEventRepository stripeEvents)
+        IStripeEventRepository stripeEvents,
+        ISecureTokenService? secureTokenService = null,
+        ICacheService? cacheService = null)
     {
         _currentUser = currentUser;
         _reservations = reservations;
@@ -42,6 +46,8 @@ public sealed class ConfirmReservationCommandHandler
         _outbox = outbox;
         _unitOfWork = unitOfWork;
         _stripeEvents = stripeEvents;
+        _secureTokenService = secureTokenService;
+        _cacheService = cacheService;
     }
 
     public async Task<ConfirmReservationResult> Handle(
@@ -124,18 +130,27 @@ public sealed class ConfirmReservationCommandHandler
             IdempotencyKey = $"reservation:{reservation.Id}"
         };
         var ticketData = Enumerable.Range(0, reservation.Quantity)
-            .Select(_ => Convert.ToHexString(RandomNumberGenerator.GetBytes(32)))
-            .Select(token => (Token: token, Ticket: new Ticket
+            .Select(_ =>
             {
-                EventId = reservation.EventId,
-                TicketTypeId = reservation.TicketTypeId,
-                AttendeeId = attendeeId,
-                Purchase = purchase,
-                PurchaseDate = confirmedAt,
-                TicketTypeNameAtPurchase = reservation.TicketType.Name,
-                PriceAtPurchase = reservation.UnitPrice,
-                QrTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)))
-            }))
+                var ticketId = Guid.NewGuid();
+                var token = _secureTokenService?.GenerateTicketQrToken(ticketId)
+                            ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+                var hash = _secureTokenService?.HashToken(token)
+                           ?? Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+
+                return (Token: token, Ticket: new Ticket
+                {
+                    Id = ticketId,
+                    EventId = reservation.EventId,
+                    TicketTypeId = reservation.TicketTypeId,
+                    AttendeeId = attendeeId,
+                    Purchase = purchase,
+                    PurchaseDate = confirmedAt,
+                    TicketTypeNameAtPurchase = reservation.TicketType.Name,
+                    PriceAtPurchase = reservation.UnitPrice,
+                    QrTokenHash = hash
+                });
+            })
             .ToList();
         var tickets = ticketData.Select(item => item.Ticket).ToList();
         purchase.Tickets = tickets;
@@ -199,6 +214,12 @@ public sealed class ConfirmReservationCommandHandler
             await _outbox.AddAsync(outboxMessage, transactionCancellationToken);
             await _unitOfWork.SaveChangesAsync(transactionCancellationToken);
         }, cancellationToken);
+
+        if (_cacheService is not null)
+        {
+            await _cacheService.RemoveByTagAsync($"event:{reservation.EventId}", cancellationToken);
+            await _cacheService.RemoveByTagAsync("events", cancellationToken);
+        }
 
         return new ConfirmReservationResult(
             reservation.PaymentId,

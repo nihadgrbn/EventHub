@@ -13,17 +13,20 @@ public sealed class UpdateEventTicketTypesCommandHandler : IRequestHandler<Updat
     private readonly ITicketRepository _ticketRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IReservationRepository? _reservationRepository;
 
     public UpdateEventTicketTypesCommandHandler(
         IEventRepository eventRepository,
         ITicketRepository ticketRepository,
         IUnitOfWork unitOfWork,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IReservationRepository? reservationRepository = null)
     {
         _eventRepository = eventRepository;
         _ticketRepository = ticketRepository;
         _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
+        _reservationRepository = reservationRepository;
     }
 
     public async Task Handle(UpdateEventTicketTypesCommand request, CancellationToken cancellationToken)
@@ -55,14 +58,24 @@ public sealed class UpdateEventTicketTypesCommandHandler : IRequestHandler<Updat
             throw new ConflictException("One or more ticket types do not belong to this event.");
         }
 
+        var existingIds = existingById.Keys.ToArray();
         var salesByTicketTypeId = await _ticketRepository.GetCountsByTicketTypeIdsAsync(
-            existingById.Keys.ToArray(), cancellationToken);
+            existingIds, cancellationToken);
+        var activeReservationsByTicketTypeId = _reservationRepository is not null
+            ? await _reservationRepository.GetActiveQuantitiesByTicketTypeIdsAsync(existingIds, cancellationToken)
+            : new Dictionary<Guid, int>();
 
         foreach (var existing in existingById.Values.Where(ticketType => !requestedExistingIds.Contains(ticketType.Id)))
         {
-            if (salesByTicketTypeId.GetValueOrDefault(existing.Id) > 0)
+            var soldCount = salesByTicketTypeId.GetValueOrDefault(existing.Id);
+            var reservedCount = activeReservationsByTicketTypeId.GetValueOrDefault(existing.Id);
+            var allocatedFromStock = Math.Max(0, existing.Quantity - existing.AvailableQuantity);
+            var committedCount = Math.Max(soldCount + reservedCount, allocatedFromStock);
+
+            if (committedCount > 0)
             {
-                throw new ConflictException($"Ticket type '{existing.Name}' cannot be deleted because tickets have already been sold.");
+                throw new ConflictException(
+                    $"Ticket type '{existing.Name}' cannot be deleted because tickets have already been sold or reserved.");
             }
 
             @event.TicketTypes.Remove(existing);
@@ -84,22 +97,27 @@ public sealed class UpdateEventTicketTypesCommandHandler : IRequestHandler<Updat
 
             var existing = existingById[requested.Id.Value];
             var soldCount = salesByTicketTypeId.GetValueOrDefault(existing.Id);
+            var reservedCount = activeReservationsByTicketTypeId.GetValueOrDefault(existing.Id);
+            var allocatedFromStock = Math.Max(0, existing.Quantity - existing.AvailableQuantity);
+            var committedCount = Math.Max(soldCount + reservedCount, allocatedFromStock);
 
-            if (soldCount > 0 && (!string.Equals(existing.Name, requested.Name.Trim(), StringComparison.Ordinal)
+            if (committedCount > 0 && (!string.Equals(existing.Name, requested.Name.Trim(), StringComparison.Ordinal)
                 || existing.Price != requested.Price))
             {
-                throw new ConflictException($"Ticket type '{existing.Name}' has sales, so its name and price cannot be changed.");
+                throw new ConflictException(
+                    $"Ticket type '{existing.Name}' has sales or active reservations, so its name and price cannot be changed.");
             }
 
-            if (requested.Quantity < soldCount)
+            if (requested.Quantity < committedCount)
             {
-                throw new ConflictException($"Ticket type '{existing.Name}' cannot have a quantity below its {soldCount} sold tickets.");
+                throw new ConflictException(
+                    $"Ticket type '{existing.Name}' cannot have a quantity below its {committedCount} sold or reserved tickets.");
             }
 
             existing.Name = requested.Name.Trim();
             existing.Price = requested.Price;
             existing.Quantity = requested.Quantity;
-            existing.AvailableQuantity = requested.Quantity - soldCount;
+            existing.AvailableQuantity = requested.Quantity - committedCount;
         }
 
         @event.UpdatedAt = DateTime.UtcNow;

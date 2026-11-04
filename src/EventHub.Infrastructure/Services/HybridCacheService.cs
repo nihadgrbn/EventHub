@@ -5,6 +5,7 @@ namespace EventHub.Infrastructure.Services;
 
 public sealed class HybridCacheService : ICacheService
 {
+    private static readonly TimeSpan MaxLocalCacheExpiration = TimeSpan.FromMinutes(1);
     private readonly HybridCache _cache;
 
     public HybridCacheService(HybridCache cache)
@@ -23,7 +24,9 @@ public sealed class HybridCacheService : ICacheService
             ? new HybridCacheEntryOptions
             {
                 Expiration = expiration.Value,
-                LocalCacheExpiration = expiration.Value
+                LocalCacheExpiration = expiration.Value < MaxLocalCacheExpiration
+                    ? expiration.Value
+                    : MaxLocalCacheExpiration
             }
             : null;
 
